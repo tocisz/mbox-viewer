@@ -30,6 +30,35 @@ def parse_labels(header_value):
     # X-Gmail-Labels: Inbox,Opened,Category Promotions
     return [label.strip() for label in header_value.split(',')]
 
+def sanitize_header(header_value):
+    """
+    Sanitize email header by removing CR/LF characters.
+    
+    Email headers containing carriage return (\\r) or line feed (\\n)
+    violate email format specifications and cause parsing errors.
+    This function strips these characters and replaces with spaces.
+    
+    Args:
+        header_value: Header string to sanitize, Header object, or None
+        
+    Returns:
+        Sanitized header string, or empty string if None
+    """
+    if not header_value:
+        return ""
+    
+    # Convert Header object to string (needed for compat32 policy)
+    header_str = str(header_value)
+    
+    # Remove CR and LF characters, replace with space
+    sanitized = header_str.replace('\r', ' ').replace('\n', ' ')
+    
+    # Collapse multiple consecutive spaces into one
+    sanitized = re.sub(r'\s+', ' ', sanitized)
+    
+    return sanitized.strip()
+
+
 def get_body(message):
     body_html = ""
     body_text = ""
@@ -68,29 +97,81 @@ def get_body(message):
     return body_html, body_text
 
 def parse_date(date_str):
+    """
+    Parse date string with multiple fallback strategies.
+    
+    Handles various date formats including:
+    - RFC 2822 (standard email dates)
+    - ISO 8601
+    - Short dates (DD-MM-YY, YY-MM-DD)
+    - Incomplete dates
+    
+    Returns datetime.now() as last resort if parsing fails.
+    """
     if not date_str:
         return datetime.now()
+    
+    # Strip whitespace
+    date_str = date_str.strip()
+    if not date_str:
+        return datetime.now()
+    
+    # Stage 1: Try standard email parser
     try:
-        # parsedate_to_datetime handles many formats
         res = email.utils.parsedate_to_datetime(date_str)
         if not isinstance(res, datetime):
             logging.warning(f"parse_date returned non-datetime: {type(res)} value: {res}")
         return res
-    except Exception as e:
-        logging.warning(f"parse_date failed for '{date_str}': {e}. Returning now()")
-        return datetime.now()
+    except Exception:
+        pass  # Continue to fallback stages
+    
+    # Stage 2: Try dateutil parser (more flexible)
+    try:
+        from dateutil import parser as dateutil_parser
+        # Use fuzzy=False to avoid false positives
+        return dateutil_parser.parse(date_str, fuzzy=False)
+    except Exception:
+        pass  # Continue to fallback stages
+    
+    # Stage 3: Try custom patterns for common malformed formats
+    try:
+        # Pattern: DD-MM-YY or YY-MM-DD (ambiguous short dates)
+        # We'll try to interpret as DD-MM-YY first (European format common in emails)
+        match = re.match(r'^(\d{2})-(\d{2})-(\d{2})$', date_str)
+        if match:
+            day, month, year = match.groups()
+            # Assume 20XX for years 00-49, 19XX for years 50-99
+            year_int = int(year)
+            full_year = 2000 + year_int if year_int < 50 else 1900 + year_int
+            return datetime(full_year, int(month), int(day))
+        
+        # Pattern: Incomplete RFC date like "Wed, 14 May 2008 15" (missing minutes/seconds)
+        # Try fuzzy parsing with dateutil as last custom attempt
+        from dateutil import parser as dateutil_parser
+        return dateutil_parser.parse(date_str, fuzzy=True, default=datetime(2000, 1, 1))
+    except Exception:
+        pass
+    
+    # Stage 4: Last resort - return current time
+    logging.warning(f"parse_date failed for '{date_str}': All parsing strategies exhausted. Returning now()")
+    return datetime.now()
+
 
 def stream_mbox_messages(mbox_path):
     """
     Lazily yields email.message.Message objects from an MBOX file.
     This avoids scanning the entire file upfront which mailbox.mbox does.
+    
+    Uses compat32 policy to avoid strict validation of malformed headers.
     """
     with open(mbox_path, 'rb') as f:
         lines = []
         for line in f:
             if line.startswith(b'From '):
                 if lines:
-                    msg = email.message_from_bytes(b''.join(lines), policy=email.policy.default)
+                    # Use compat32 policy to avoid strict header validation
+                    # This allows us to sanitize CR/LF later rather than failing on parse
+                    msg = email.message_from_bytes(b''.join(lines), policy=email.policy.compat32)
                     yield msg
                     lines = []
             else:
@@ -98,8 +179,9 @@ def stream_mbox_messages(mbox_path):
         
         # Yield the last message
         if lines:
-            msg = email.message_from_bytes(b''.join(lines), policy=email.policy.default)
+            msg = email.message_from_bytes(b''.join(lines), policy=email.policy.compat32)
             yield msg
+
 
 def generate_docs(mbox_path):
     logging.info(f"Opening MBOX file: {mbox_path} (streaming mode)")
@@ -112,12 +194,17 @@ def generate_docs(mbox_path):
             logging.info(f"Processed {i} emails...")
             
         try:
-            msg_id = message.get("Message-ID", f"generated-{i}")
-            subject = message.get("Subject", "")
-            sender = message.get("From", "")
-            recipients = message.get("To", "")
+            # Get headers and sanitize to remove CR/LF characters
+            msg_id = sanitize_header(message.get("Message-ID", f"generated-{i}"))
+            subject = sanitize_header(message.get("Subject", ""))
+            sender = sanitize_header(message.get("From", ""))
+            recipients = sanitize_header(message.get("To", ""))
             date_str = message.get("Date", "")
             labels = parse_labels(message.get("X-Gmail-Labels", ""))
+            
+            # Use generated ID if sanitized ID is empty
+            if not msg_id:
+                msg_id = f"generated-{i}"
             
             body_html, body_text = get_body(message)
             
@@ -142,6 +229,7 @@ def generate_docs(mbox_path):
             yield doc
         except Exception as e:
             logging.error(f"Failed to process message {i}: {e}")
+
 
 def create_index(es, reindex=False):
     if reindex and es.indices.exists(index="emails"):
