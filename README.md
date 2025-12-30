@@ -4,53 +4,81 @@ A local web application to view and search emails from a Gmail MBOX export (`Tak
 
 ## Prerequisites
 
-The following tools are required but were not found in your environment. Please install them:
+Ensure you have the following installed:
+- **Python 3.10+**
+- **Node.js 18+** & **npm**
+- **Elasticsearch 8.17.0** (Already included in the repository)
 
-### 1. Python 3 & Pip
+---
+
+## 1. Start Elasticsearch
+
+The project uses a local Elasticsearch instance located in the root directory.
+
 ```bash
-sudo apt update
-sudo apt install python3 python3-pip python3-venv
+# From the project root
+./elasticsearch-8.17.0/bin/elasticsearch
 ```
 
-### 2. Node.js & npm (for Frontend)
+Wait until you see a log message indicating that Elasticsearch is "started" or "ready".
+
+---
+
+## 2. Setup & Start Backend
+
+The backend is built with FastAPI and runs on Python.
+
+### Setup Environment
 ```bash
-# Using NodeSource (recommended for newer versions)
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt install -y nodejs
+# Navigate to backend directory
+cd backend
+
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### 3. Elasticsearch (Search Engine)
+### Index Your MBOX File
+If you haven't indexed your data yet, run the indexer. Replace the path with your actual MBOX file location.
+
 ```bash
-wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-8.x.list
-sudo apt-get update && sudo apt-get install elasticsearch
-sudo systemctl enable elasticsearch && sudo systemctl start elasticsearch
+# Ensure you are in the backend directory with .venv activated
+python indexer.py --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox"
 ```
-*Verify it's running:* `curl localhost:9200`
 
-## Setup
+### Start API Server
+```bash
+# Ensure you are in the backend directory with .venv activated
+uvicorn server:app --reload
+```
+The API will be available at `http://localhost:8000`.
 
-### Backend
-1.  Navigate to `backend`:
-    ```bash
-    cd backend
-    ```
-2.  Install dependencies:
-    ```bash
-    pip3 install -r requirements.txt
-    ```
-3.  **Index your MBOX file** (this may take a while):
-    ```bash
-    python3 indexer.py --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox"
-    ```
-4.  Start the API server:
-    ```bash
-    uvicorn server:app --reload
-    ```
+---
 
-### Frontend (To Be Implemented)
-Once Node.js is installed, I will generate the React application for you.
+## 3. Setup & Start Frontend
+
+The frontend is a React application built with Vite.
+
+### Setup & Run
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+The frontend will be available at `http://localhost:5173`.
+
+---
 
 ## Project Structure
-*   `backend/`: Python FastAPI server and Indexer.
-*   `frontend/`: React Web UI (Coming soon).
+*   `backend/`: FastAPI server and MBOX indexer logic.
+*   `frontend/`: React + Vite web user interface.
+*   `elasticsearch-8.17.0/`: Local Elasticsearch instance.
+*   `Takeout/`: (Ignored) Gmail export data.

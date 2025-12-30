@@ -139,13 +139,15 @@ def generate_docs(mbox_path):
                     "has_attachment": False # Placeholder, logic can be improved
                 }
             }
-            if i == 102:
-                logging.info(f"INSPECTING DOC 102: date_field_value={doc['_source']['date']} type={type(doc['_source']['date'])}")
             yield doc
         except Exception as e:
             logging.error(f"Failed to process message {i}: {e}")
 
-def create_index(es):
+def create_index(es, reindex=False):
+    if reindex and es.indices.exists(index="emails"):
+        logging.info("Deleting existing index 'emails' for reindexing...")
+        es.indices.delete(index="emails")
+
     if not es.indices.exists(index="emails"):
         es.indices.create(index="emails", body={
             "mappings": {
@@ -156,7 +158,8 @@ def create_index(es):
                     "date": {"type": "date"},
                     "labels": {"type": "keyword"},
                     "body_text": {"type": "text"},
-                    "body_html": {"type": "keyword", "index": False}, # Do not index HTML markup
+                    "body_html": {"type": "text", "index": False}, # Changed from keyword to text, not indexed
+                    "has_attachment": {"type": "boolean"}
                 }
             }
         })
@@ -166,6 +169,7 @@ def main():
     parser = argparse.ArgumentParser(description="Index Gmail MBOX to Elasticsearch")
     parser.add_argument("--mbox", required=True, help="Path to MBOX file")
     parser.add_argument("--es-host", default="http://localhost:9200", help="Elasticsearch URL")
+    parser.add_argument("--reindex", action="store_true", help="Delete and recreate the index before indexing")
     args = parser.parse_args()
 
     es = Elasticsearch(args.es_host)
@@ -174,17 +178,14 @@ def main():
         logging.error(f"Cannot connect to Elasticsearch at {args.es_host}. Is it running?")
         sys.exit(1)
         
-    create_index(es)
+    create_index(es, reindex=args.reindex)
     
     logging.info("Starting indexing...")
     try:
         helpers.bulk(es, generate_docs(args.mbox), chunk_size=500)
         logging.info("Indexing complete.")
     except BulkIndexError as e:
-        logging.error(f"{len(e.errors)} documents failed to index.")
-        for i, error in enumerate(e.errors):
-            if i >= 5: break
-            logging.error(f"Error {i}: {error}")
+        logging.error(f"{len(e.errors)} documents failed to index. First error: {e.errors[0]}")
         sys.exit(1)
 
 if __name__ == "__main__":
