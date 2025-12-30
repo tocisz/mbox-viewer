@@ -165,6 +165,20 @@ class TestIndexer(unittest.TestCase):
         # Test 9: Complex Subject with newlines
         result = sanitize_header("Re: Important\nMeeting\rSchedule")
         self.assertEqual(result, "Re: Important Meeting Schedule")
+        
+        # Test 10: MIME-encoded header (RFC 2047) - ISO-8859-2 Polish
+        result = sanitize_header("=?iso-8859-2?Q?Rozpocz=EAcie_zam=F3wienia_-_PKP_Intercity?=")
+        # Should decode the MIME encoding
+        self.assertIn("Rozpocz", result)
+        self.assertNotIn("=?iso-8859-2?Q?", result)
+        
+        # Test 11: MIME-encoded header - UTF-8
+        result = sanitize_header("=?UTF-8?B?VGVzdCBTdWJqZWN0?=")
+        self.assertEqual(result, "Test Subject")
+        
+        # Test 12: Mixed MIME and plain text
+        result = sanitize_header("Re: =?UTF-8?Q?Test?= Message")
+        self.assertEqual(result, "Re: Test Message")
 
 
 if __name__ == '__main__':

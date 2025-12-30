@@ -32,23 +32,40 @@ def parse_labels(header_value):
 
 def sanitize_header(header_value):
     """
-    Sanitize email header by removing CR/LF characters.
+    Sanitize email header by removing CR/LF characters and decoding MIME encoding.
     
     Email headers containing carriage return (\\r) or line feed (\\n)
     violate email format specifications and cause parsing errors.
-    This function strips these characters and replaces with spaces.
+    This function also decodes RFC 2047 MIME-encoded headers like:
+    =?iso-8859-2?Q?Rozpocz=EAcie_zam=F3wienia?=
     
     Args:
         header_value: Header string to sanitize, Header object, or None
         
     Returns:
-        Sanitized header string, or empty string if None
+        Sanitized and decoded header string, or empty string if None
     """
     if not header_value:
         return ""
     
     # Convert Header object to string (needed for compat32 policy)
     header_str = str(header_value)
+    
+    # Decode MIME-encoded headers (RFC 2047)
+    try:
+        import email.header
+        decoded_parts = email.header.decode_header(header_str)
+        decoded_str = ""
+        for part, encoding in decoded_parts:
+            if isinstance(part, bytes):
+                # Decode bytes using specified encoding or utf-8 as fallback
+                decoded_str += part.decode(encoding or 'utf-8', errors='replace')
+            else:
+                decoded_str += part
+        header_str = decoded_str
+    except Exception:
+        # If decoding fails, use the original string
+        pass
     
     # Remove CR and LF characters, replace with space
     sanitized = header_str.replace('\r', ' ').replace('\n', ' ')
