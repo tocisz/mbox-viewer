@@ -13,36 +13,46 @@ export const useLabels = () => {
     return labels;
 };
 
-export const useEmails = (label, query, page) => {
+export const useEmails = (label, query, page, startDate, endDate) => {
     const [emails, setEmails] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+
+    useEffect(() => {
+        // Reset emails when filters change
+        setEmails([]);
+        setHasMore(true);
+    }, [label, query, startDate, endDate]);
 
     useEffect(() => {
         setLoading(true);
         let url = `${API_Base}/search?page=${page}&size=20`;
         if (label) url += `&label=${encodeURIComponent(label)}`;
         if (query) url += `&q=${encodeURIComponent(query)}`;
+        if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+        if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
 
         fetch(url)
             .then(res => res.json())
             .then(data => {
-                if (data && data.items) {
-                    setEmails(data.items);
-                    setTotal(data.total);
+                const items = data.items || [];
+                if (page === 1) {
+                    setEmails(items);
                 } else {
-                    setEmails([]);
-                    setTotal(0);
+                    setEmails(prev => [...prev, ...items]);
                 }
+                setTotal(data.total || 0);
+                setHasMore(items.length === 20); // If we got a full page, there might be more
                 setLoading(false);
             })
             .catch(err => {
                 console.error("Failed to fetch emails", err);
                 setLoading(false);
             });
-    }, [label, query, page]);
+    }, [label, query, page, startDate, endDate]);
 
-    return { emails, total, loading };
+    return { emails, total, loading, hasMore };
 };
 
 export const useEmailDetail = (id) => {

@@ -8,6 +8,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [selectedEmailId, setSelectedEmailId] = useState(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -23,7 +25,7 @@ export default function App() {
           <div className="w-64 font-bold text-xl text-gray-700 flex items-center gap-2">
             <span>✉️</span> ArchiveViewer
           </div>
-          <form onSubmit={handleSearch} className="flex-1 max-w-2xl">
+          <form onSubmit={handleSearch} className="flex-1 max-w-xl">
             <div className="relative">
               <input
                 type="text"
@@ -34,7 +36,34 @@ export default function App() {
               />
             </div>
           </form>
-          <div className="w-32"></div>
+          <div className="flex items-center gap-2 text-gray-600">
+            <div className="flex items-center gap-1">
+              <label className="text-xs font-medium">From:</label>
+              <input
+                type="date"
+                className="bg-gray-100 border-none rounded-md py-1 px-2 outline-none focus:bg-white focus:ring-1 focus:ring-blue-400"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <label className="text-xs font-medium">To:</label>
+              <input
+                type="date"
+                className="bg-gray-100 border-none rounded-md py-1 px-2 outline-none focus:bg-white focus:ring-1 focus:ring-blue-400"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                onClick={() => { setStartDate(""); setEndDate(""); }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -50,6 +79,8 @@ export default function App() {
             <EmailList
               label={selectedLabel}
               query={searchQuery}
+              startDate={startDate}
+              endDate={endDate}
               onSelectEmail={setSelectedEmailId}
               selectedEmailId={selectedEmailId}
             />

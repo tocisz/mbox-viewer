@@ -76,10 +76,13 @@ def get_labels():
 def search_emails(
     q: Optional[str] = None,
     label: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     page: int = 1,
     size: int = 20
 ):
     must_clauses = []
+    filter_clauses = []
     
     if q:
         must_clauses.append({
@@ -90,19 +93,34 @@ def search_emails(
         })
     
     if label:
-        if label.lower() == "inbox":
-             must_clauses.append({"term": {"labels": "Inbox"}})
+        if label.lower() == "all":
+             pass # Don't filter by label
+        elif label.lower() == "inbox":
+             filter_clauses.append({"term": {"labels": "Inbox"}})
         elif label.lower() == "sent":
-             must_clauses.append({"term": {"labels": "Sent"}})
+             filter_clauses.append({"term": {"labels": "Sent"}})
         else:
-             must_clauses.append({"term": {"labels": label}})
+             filter_clauses.append({"term": {"labels": label}})
+
+    if start_date or end_date:
+        range_clause = {"range": {"date": {}}}
+        if start_date:
+            range_clause["range"]["date"]["gte"] = start_date
+        if end_date:
+            range_clause["range"]["date"]["lte"] = end_date
+        filter_clauses.append(range_clause)
 
     # Default sort by date desc
     query_body = {
         "from": (page - 1) * size,
         "size": size,
         "sort": [{"date": {"order": "desc"}}],
-        "query": {"bool": {"must": must_clauses}} if must_clauses else {"match_all": {}},
+        "query": {
+            "bool": {
+                "must": must_clauses if must_clauses else [],
+                "filter": filter_clauses if filter_clauses else []
+            }
+        },
         "_source": ["subject", "from", "date", "labels", "body_text", "has_attachment"] # Don't fetch full HTML for list
     }
     

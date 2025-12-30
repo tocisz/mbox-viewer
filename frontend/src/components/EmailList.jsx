@@ -1,16 +1,33 @@
+import { useState, useEffect, useRef } from 'react';
 import { useEmails } from '../hooks';
 
-export default function EmailList({ label, query, onSelectEmail, selectedEmailId }) {
-    const { emails, loading } = useEmails(label, query, 1);
+export default function EmailList({ label, query, startDate, endDate, onSelectEmail, selectedEmailId }) {
+    const [page, setPage] = useState(1);
+    const { emails, loading, hasMore } = useEmails(label, query, page, startDate, endDate);
+    const observer = useRef();
 
-    if (loading) return <div className="p-4">Loading...</div>;
+    useEffect(() => {
+        setPage(1);
+    }, [label, query, startDate, endDate]);
+
+    const lastEmailElementRef = node => {
+        if (loading) return;
+        if (observer.current) observer.current.disconnect();
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMore) {
+                setPage(prevPage => prevPage + 1);
+            }
+        });
+        if (node) observer.current.observe(node);
+    };
 
     return (
         <div className="flex-1 bg-white flex flex-col overflow-y-auto">
-            {emails.length === 0 && <div className="p-8 text-center text-gray-500">No emails found</div>}
-            {emails.map(email => (
+            {emails.length === 0 && !loading && <div className="p-8 text-center text-gray-500">No emails found</div>}
+            {emails.map((email, index) => (
                 <div
                     key={email.id}
+                    ref={emails.length === index + 1 ? lastEmailElementRef : null}
                     onClick={() => onSelectEmail(email.id)}
                     className={`border-b px-4 py-3 cursor-pointer hover:shadow-md transition-shadow flex items-center gap-4 ${selectedEmailId === email.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50'}`}
                 >
@@ -26,6 +43,7 @@ export default function EmailList({ label, query, onSelectEmail, selectedEmailId
                     </div>
                 </div>
             ))}
+            {loading && <div className="p-4 text-center text-gray-400">Loading...</div>}
         </div>
     );
 }

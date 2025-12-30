@@ -14,6 +14,12 @@ export default function Sidebar({ selectedLabel, onSelectLabel }) {
         <div className="w-64 bg-white border-r h-full flex flex-col overflow-y-auto">
             <div className="p-4 text-xl font-bold text-red-600">Gmail Archive</div>
             <nav className="flex-1">
+                <button
+                    onClick={() => onSelectLabel("ALL")}
+                    className={`w-full text-left px-6 py-2 hover:bg-gray-100 rounded-r-full mr-2 ${selectedLabel === "ALL" ? 'bg-red-50 text-red-600 font-semibold' : 'text-gray-700'}`}
+                >
+                    ALL
+                </button>
                 {sysLabels.map(label => (
                     <button
                         key={label}
