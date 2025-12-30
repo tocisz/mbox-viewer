@@ -85,7 +85,7 @@ def stream_mbox_messages(mbox_path):
         for line in f:
             if line.startswith(b'From '):
                 if lines:
-                    msg = email.message_from_bytes(b''.join(lines), policy=email.policy.compat32)
+                    msg = email.message_from_bytes(b''.join(lines), policy=email.policy.default)
                     yield msg
                     lines = []
             else:
@@ -93,7 +93,7 @@ def stream_mbox_messages(mbox_path):
         
         # Yield the last message
         if lines:
-            msg = email.message_from_bytes(b''.join(lines), policy=email.policy.compat32)
+            msg = email.message_from_bytes(b''.join(lines), policy=email.policy.default)
             yield msg
 
 def generate_docs(mbox_path):
