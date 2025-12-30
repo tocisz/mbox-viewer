@@ -7,6 +7,6 @@ if curl -s http://localhost:9200 > /dev/null; then
 else
     echo "Starting Elasticsearch in background..."
     # -d runs it in daemon mode
-    ./elasticsearch-8.17.0/bin/elasticsearch -d
+    ./elasticsearch-8.17.0/bin/elasticsearch -d -E xpack.security.enabled=false -E discovery.type=single-node
     echo "Elasticsearch starting. Use 'curl http://localhost:9200' to check status."
 fi
