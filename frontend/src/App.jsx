@@ -88,8 +88,16 @@ export default function App() {
 
           {/* Detail View */}
           {selectedEmailId && (
-            <div className="flex-1 flex flex-col overflow-hidden bg-white">
-              <EmailDetail id={selectedEmailId} />
+            <div className="flex-1 flex flex-col overflow-hidden bg-white relative">
+              <EmailDetail
+                id={selectedEmailId}
+                onClose={() => setSelectedEmailId(null)}
+                onSelectLabel={(label) => {
+                  setSelectedLabel(label);
+                  setSearchQuery("");
+                  setSelectedEmailId(null);
+                }}
+              />
             </div>
           )}
 
