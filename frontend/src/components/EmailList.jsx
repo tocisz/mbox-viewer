@@ -15,8 +15,9 @@ export default function EmailList({ label, query, onSelectEmail, selectedEmailId
                     className={`border-b px-4 py-3 cursor-pointer hover:shadow-md transition-shadow flex items-center gap-4 ${selectedEmailId === email.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50'}`}
                 >
                     <div className="w-48 font-semibold truncate text-gray-900">{email.sender}</div>
-                    <div className="flex-1 min-w-0">
-                        <span className="font-medium text-gray-800">{email.subject}</span>
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <span className="font-medium text-gray-800 truncate">{email.subject}</span>
+                        {email.has_attachment && <span title="Has attachment">📎</span>}
                         <span className="text-gray-500 mx-1">-</span>
                         <span className="text-gray-500 truncate">{email.snippet}</span>
                     </div>

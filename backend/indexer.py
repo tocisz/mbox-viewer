@@ -113,6 +113,88 @@ def get_body(message):
 
     return body_html, body_text
 
+def extract_attachments(message, msg_id, attachments_dir=None):
+    """
+    Extract attachments from email message.
+    
+    Saves attachment files to disk and returns metadata.
+    
+    Args:
+        message: email.message.Message object
+        msg_id: Message ID (used for directory name)
+        attachments_dir: Base directory for storing attachments (optional)
+        
+    Returns:
+        List of attachment metadata dicts with keys:
+        - filename: Original attachment filename
+        - size: File size in bytes
+        - content_type: MIME content type
+        - path: Relative path to saved file
+    """
+    attachments = []
+    
+    if not attachments_dir:
+        return attachments
+    
+    # Sanitize message ID for use as directory name
+    # Remove characters that are problematic in filenames
+    safe_msg_id = re.sub(r'[<>:"/\\|?*]', '_', msg_id)
+    msg_dir = os.path.join(attachments_dir, safe_msg_id)
+    
+    if not message.is_multipart():
+        return attachments
+    
+    for part in message.walk():
+        content_disposition = str(part.get("Content-Disposition", ""))
+        
+        if "attachment" not in content_disposition:
+            continue
+            
+        # Get filename
+        filename = part.get_filename()
+        if not filename:
+            # Generate filename if not provided
+            ext = part.get_content_type().split('/')[-1]
+            filename = f"attachment_{len(attachments)}.{ext}"
+        
+        # Decode filename if it's MIME-encoded
+        filename = sanitize_header(filename)
+        
+        # Sanitize filename further: remove path separators and stay safe
+        # We replace slashes and backslashes with underscores to preserve the full name
+        # but avoid directory traversal or "file not found" errors.
+        filename = filename.replace('/', '_').replace('\\', '_')
+        # Remove any other potentially problematic characters for the filesystem
+        filename = re.sub(r'[<>:"|?*]', '_', filename)
+        
+        # Get content
+        try:
+            payload = part.get_payload(decode=True)
+            if not payload:
+                continue
+                
+            # Create message directory if it doesn't exist
+            os.makedirs(msg_dir, exist_ok=True)
+            
+            # Save file
+            file_path = os.path.join(msg_dir, filename)
+            with open(file_path, 'wb') as f:
+                f.write(payload)
+            
+            # Store metadata
+            relative_path = os.path.join(safe_msg_id, filename)
+            attachments.append({
+                'filename': filename,
+                'size': len(payload),
+                'content_type': part.get_content_type(),
+                'path': relative_path
+            })
+            
+        except Exception as e:
+            logging.warning(f"Failed to extract attachment '{filename}': {e}")
+    
+    return attachments
+
 def parse_date(date_str):
     """
     Parse date string with multiple fallback strategies.
@@ -200,7 +282,7 @@ def stream_mbox_messages(mbox_path):
             yield msg
 
 
-def generate_docs(mbox_path):
+def generate_docs(mbox_path, attachments_dir=None):
     logging.info(f"Opening MBOX file: {mbox_path} (streaming mode)")
     
     # Use streaming generator instead of mailbox.mbox
@@ -228,6 +310,9 @@ def generate_docs(mbox_path):
             # If no text body, try to create one from HTML for search
             if not body_text and body_html:
                 body_text = clean_html(body_html)
+            
+            # Extract attachments
+            attachments = extract_attachments(message, msg_id, attachments_dir)
                 
             doc = {
                 "_index": "emails",
@@ -240,12 +325,14 @@ def generate_docs(mbox_path):
                     "labels": labels,
                     "body_text": body_text,
                     "body_html": body_html, # Store full HTML for display
-                    "has_attachment": False # Placeholder, logic can be improved
+                    "has_attachment": len(attachments) > 0,
+                    "attachments": attachments
                 }
             }
             yield doc
         except Exception as e:
             logging.error(f"Failed to process message {i}: {e}")
+
 
 
 def create_index(es, reindex=False):
@@ -264,17 +351,28 @@ def create_index(es, reindex=False):
                     "labels": {"type": "keyword"},
                     "body_text": {"type": "text"},
                     "body_html": {"type": "text", "index": False}, # Changed from keyword to text, not indexed
-                    "has_attachment": {"type": "boolean"}
+                    "has_attachment": {"type": "boolean"},
+                    "attachments": {
+                        "type": "nested",
+                        "properties": {
+                            "filename": {"type": "keyword"},
+                            "size": {"type": "long"},
+                            "content_type": {"type": "keyword"},
+                            "path": {"type": "keyword"}
+                        }
+                    }
                 }
             }
         })
         logging.info("Created index 'emails'")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Index Gmail MBOX to Elasticsearch")
     parser.add_argument("--mbox", required=True, help="Path to MBOX file")
     parser.add_argument("--es-host", default="http://localhost:9200", help="Elasticsearch URL")
     parser.add_argument("--reindex", action="store_true", help="Delete and recreate the index before indexing")
+    parser.add_argument("--attachments-dir", help="Directory to store attachment files")
     args = parser.parse_args()
 
     es = Elasticsearch(args.es_host)
@@ -287,7 +385,8 @@ def main():
     
     logging.info("Starting indexing...")
     try:
-        helpers.bulk(es, generate_docs(args.mbox), chunk_size=500)
+        helpers.bulk(es, generate_docs(args.mbox, attachments_dir=args.attachments_dir), chunk_size=500)
+
         logging.info("Indexing complete.")
     except BulkIndexError as e:
         logging.error(f"{len(e.errors)} documents failed to index. First error: {e.errors[0]}")

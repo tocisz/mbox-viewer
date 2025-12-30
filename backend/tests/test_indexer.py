@@ -9,7 +9,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import indexer
-from indexer import stream_mbox_messages, generate_docs, clean_html, parse_labels, sanitize_header
+from indexer import stream_mbox_messages, generate_docs, clean_html, parse_labels, sanitize_header, extract_attachments
 
 class TestIndexer(unittest.TestCase):
     def setUp(self):
@@ -179,6 +179,78 @@ class TestIndexer(unittest.TestCase):
         # Test 12: Mixed MIME and plain text
         result = sanitize_header("Re: =?UTF-8?Q?Test?= Message")
         self.assertEqual(result, "Re: Test Message")
+
+    def test_extract_attachments(self):
+        """Test extraction of attachments to disk and metadata generation"""
+        import shutil
+        import email
+        from email.message import EmailMessage
+        
+        # Setup temp attachments dir
+        test_attachments_dir = "test_attachments_tmp"
+        if os.path.exists(test_attachments_dir):
+            shutil.rmtree(test_attachments_dir)
+        os.makedirs(test_attachments_dir)
+        
+        try:
+            # Create a multipart message with an attachment
+            msg = EmailMessage()
+            msg['Subject'] = 'Test with attachment'
+            msg['From'] = 'sender@example.com'
+            msg['To'] = 'recipient@example.com'
+            msg['Message-ID'] = '<test-id-123>'
+            msg.set_content('This is the body.')
+            
+            # Add attachment
+            msg.add_attachment(b'Fake PDF content', 
+                              maintype='application', 
+                              subtype='pdf', 
+                              filename='test.pdf')
+            
+            # Convert to Message object (compat32 compliant as per our indexer)
+            msg_bytes = msg.as_bytes()
+            msg_obj = email.message_from_bytes(msg_bytes, policy=email.policy.compat32)
+            
+            # Test extraction
+            attachments = extract_attachments(msg_obj, '<test-id-123>', test_attachments_dir)
+            
+            self.assertEqual(len(attachments), 1)
+            self.assertEqual(attachments[0]['filename'], 'test.pdf')
+            self.assertEqual(attachments[0]['size'], len(b'Fake PDF content'))
+            self.assertEqual(attachments[0]['content_type'], 'application/pdf')
+            # The path might use _ instead of <> depending on sanitization
+            expected_partial_path = '_test-id-123_/test.pdf'
+            self.assertIn('test.pdf', attachments[0]['path'])
+            
+            # Verify file exists on disk
+            full_path = os.path.join(test_attachments_dir, attachments[0]['path'])
+            self.assertTrue(os.path.exists(full_path))
+            with open(full_path, 'rb') as f:
+                self.assertEqual(f.read(), b'Fake PDF content')
+
+            # Test 2: Attachment with slashes in filename
+            msg2 = EmailMessage()
+            msg2['Message-ID'] = '<test-id-456>'
+            msg2.add_attachment(b'Fake Image content', 
+                               maintype='image', 
+                               subtype='png', 
+                               filename='images/idcard.png')
+            
+            msg_obj2 = email.message_from_bytes(msg2.as_bytes(), policy=email.policy.compat32)
+            attachments2 = extract_attachments(msg_obj2, '<test-id-456>', test_attachments_dir)
+            
+            self.assertEqual(len(attachments2), 1)
+            # Filename should be sanitized (slashes replaced)
+            self.assertEqual(attachments2[0]['filename'], 'images_idcard.png')
+            self.assertIn('images_idcard.png', attachments2[0]['path'])
+            
+            full_path2 = os.path.join(test_attachments_dir, attachments2[0]['path'])
+            self.assertTrue(os.path.exists(full_path2))
+                
+        finally:
+            # Cleanup
+            if os.path.exists(test_attachments_dir):
+                shutil.rmtree(test_attachments_dir)
 
 
 if __name__ == '__main__':

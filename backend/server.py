@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from elasticsearch import Elasticsearch
 from pydantic import BaseModel
 from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 app = FastAPI()
 
@@ -17,6 +19,14 @@ app.add_middleware(
 
 es = Elasticsearch("http://localhost:9200")
 
+ATTACHMENTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "attachments")
+
+class Attachment(BaseModel):
+    filename: str
+    size: int
+    content_type: str
+    path: str
+
 class EmailSummary(BaseModel):
     id: str
     subject: str
@@ -24,6 +34,7 @@ class EmailSummary(BaseModel):
     date: str
     snippet: str
     labels: List[str]
+    has_attachment: bool = False
 
 class EmailDetail(BaseModel):
     id: str
@@ -33,6 +44,7 @@ class EmailDetail(BaseModel):
     date: str
     labels: List[str]
     body_html: str
+    attachments: List[Attachment] = []
 
 @app.get("/health")
 def health():
@@ -91,7 +103,7 @@ def search_emails(
         "size": size,
         "sort": [{"date": {"order": "desc"}}],
         "query": {"bool": {"must": must_clauses}} if must_clauses else {"match_all": {}},
-        "_source": ["subject", "from", "date", "labels", "body_text"] # Don't fetch full HTML for list
+        "_source": ["subject", "from", "date", "labels", "body_text", "has_attachment"] # Don't fetch full HTML for list
     }
     
     res = es.search(index="emails", body=query_body)
@@ -107,7 +119,8 @@ def search_emails(
             "sender": src.get("from", ""),
             "date": src.get("date", ""),
             "snippet": snippet,
-            "labels": src.get("labels", [])
+            "labels": src.get("labels", []),
+            "has_attachment": src.get("has_attachment", False)
         })
         
     return {
@@ -129,8 +142,23 @@ def get_email(email_id: str):
             "to": src.get("to", ""),
             "date": src.get("date", ""),
             "labels": src.get("labels", []),
-            "body_html": src.get("body_html", "") or f"<pre>{src.get('body_text', '')}</pre>"
+            "body_html": src.get("body_html", "") or f"<pre>{src.get('body_text', '')}</pre>",
+            "attachments": src.get("attachments", [])
         }
     except Exception:
         raise HTTPException(status_code=404, detail="Email not found")
+
+@app.get("/attachment/{path:path}")
+async def get_attachment(path: str):
+    file_path = os.path.join(ATTACHMENTS_DIR, path)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    
+    # Security: check if the file is inside the attachments directory
+    abs_attachments_dir = os.path.abspath(ATTACHMENTS_DIR)
+    abs_file_path = os.path.abspath(file_path)
+    if not abs_file_path.startswith(abs_attachments_dir):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return FileResponse(file_path, filename=os.path.basename(file_path))
 
