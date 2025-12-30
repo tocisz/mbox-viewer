@@ -5,6 +5,7 @@ import argparse
 import email
 import email.policy
 from elasticsearch import Elasticsearch, helpers
+from elasticsearch.helpers import BulkIndexError
 from bs4 import BeautifulSoup
 import logging
 from datetime import datetime
@@ -71,8 +72,12 @@ def parse_date(date_str):
         return datetime.now()
     try:
         # parsedate_to_datetime handles many formats
-        return email.utils.parsedate_to_datetime(date_str)
-    except Exception:
+        res = email.utils.parsedate_to_datetime(date_str)
+        if not isinstance(res, datetime):
+            logging.warning(f"parse_date returned non-datetime: {type(res)} value: {res}")
+        return res
+    except Exception as e:
+        logging.warning(f"parse_date failed for '{date_str}': {e}. Returning now()")
         return datetime.now()
 
 def stream_mbox_messages(mbox_path):
@@ -134,6 +139,8 @@ def generate_docs(mbox_path):
                     "has_attachment": False # Placeholder, logic can be improved
                 }
             }
+            if i == 102:
+                logging.info(f"INSPECTING DOC 102: date_field_value={doc['_source']['date']} type={type(doc['_source']['date'])}")
             yield doc
         except Exception as e:
             logging.error(f"Failed to process message {i}: {e}")
@@ -170,8 +177,15 @@ def main():
     create_index(es)
     
     logging.info("Starting indexing...")
-    helpers.bulk(es, generate_docs(args.mbox), chunk_size=500)
-    logging.info("Indexing complete.")
+    try:
+        helpers.bulk(es, generate_docs(args.mbox), chunk_size=500)
+        logging.info("Indexing complete.")
+    except BulkIndexError as e:
+        logging.error(f"{len(e.errors)} documents failed to index.")
+        for i, error in enumerate(e.errors):
+            if i >= 5: break
+            logging.error(f"Error {i}: {error}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
