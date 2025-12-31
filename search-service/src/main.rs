@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use chrono::{NaiveDate, NaiveDateTime, Utc};
@@ -87,6 +87,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/labels", get(get_labels))
         .route("/doc/:id", get(get_document))
         .route("/create/:name", post(create_index))
+        .route("/delete/:name", delete(delete_index))
         .layer(CorsLayer::permissive())
         .layer(axum::extract::DefaultBodyLimit::max(50_000_000))
         .with_state(state);
@@ -110,6 +111,28 @@ async fn create_index(Path(name): Path<String>) -> impl IntoResponse {
         StatusCode::OK,
         Json(serde_json::json!({"status": "created", "index": name})),
     )
+}
+
+async fn delete_index(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+) -> impl IntoResponse {
+    info!("Deleting/Clearing index: {}", name);
+    let mut writer = state.writer.write().unwrap();
+    writer.delete_all_documents().ok();
+    match writer.commit() {
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"status": "deleted", "index": name})),
+        ),
+        Err(e) => {
+            error!("Failed to clear index: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
+    }
 }
 
 async fn index_documents(

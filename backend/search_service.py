@@ -90,10 +90,9 @@ class TantivyServiceBridge(SearchService):
 
     def create_index(self, index_name: str, mapping: Dict[str, Any], reindex: bool = False):
         logging.info(f"TantivyService: Creating index {index_name}")
-        # The Tantivy service's /create endpoint might not use mapping or reindex directly.
-        # We'll just call the endpoint to create the index.
-        # If reindex is true, we might need a delete endpoint first, but the instruction only shows /create.
-        # For now, we'll just call create.
+        if reindex:
+            logging.info(f"TantivyService: Deleting existing index '{index_name}' for reindexing...")
+            self.requests.delete(f"{self.api_base_url}/delete/{index_name}")
         response = self.requests.post(f"{self.api_base_url}/create/{index_name}")
         if response.status_code != 200:
             logging.error(f"Failed to create index {index_name}: {response.text}")
