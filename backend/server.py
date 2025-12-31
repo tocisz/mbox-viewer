@@ -147,9 +147,9 @@ def get_email(email_id: str):
             "sender": src.get("from", ""),
             "to": src.get("to", ""),
             "date": src.get("date", ""),
-            "labels": src.get("labels", []),
+            "labels": src.get("labels") or [],
             "body_html": src.get("body_html", "") or f"<pre>{src.get('body_text', '')}</pre>",
-            "attachments": src.get("attachments", [])
+            "attachments": src.get("attachments") or []
         }
     except Exception:
         raise HTTPException(status_code=404, detail="Email not found")

@@ -89,9 +89,14 @@ class TantivyServiceBridge(SearchService):
             return False
 
     def create_index(self, index_name: str, mapping: Dict[str, Any], reindex: bool = False):
-        # Implementation depends on how the Rust service handles index creation
-        logging.info(f"TantivyService: Creating index {index_name} (Not implemented)")
-        pass
+        logging.info(f"TantivyService: Creating index {index_name}")
+        # The Tantivy service's /create endpoint might not use mapping or reindex directly.
+        # We'll just call the endpoint to create the index.
+        # If reindex is true, we might need a delete endpoint first, but the instruction only shows /create.
+        # For now, we'll just call create.
+        response = self.requests.post(f"{self.api_base_url}/create/{index_name}")
+        if response.status_code != 200:
+            logging.error(f"Failed to create index {index_name}: {response.text}")
 
     def index_documents(self, index_name: str, documents: Iterable[Dict[str, Any]]):
         logging.info(f"TantivyService: Indexing documents to {index_name}")
@@ -131,8 +136,15 @@ class TantivyServiceBridge(SearchService):
         logging.info(f"TantivyService: Searching in {index_name}")
         response = self.requests.post(f"{self.api_base_url}/search", json=query_body)
         if response.status_code == 200:
-            return response.json()
-        return {"hits": {"total": {"value": 0}, "hits": []}}
+            data = response.json()
+            # Wrap in ES compatible structure
+            return {
+                "hits": {
+                    "total": {"value": data.get("total", 0), "relation": "eq"},
+                    "hits": data.get("hits", [])
+                }
+            }
+        return {"hits": {"total": {"value": 0, "relation": "eq"}, "hits": []}}
 
     def get_document(self, index_name: str, doc_id: str) -> Dict[str, Any]:
         logging.info(f"TantivyService: Getting document {doc_id} from {index_name}")

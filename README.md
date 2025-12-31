@@ -76,6 +76,20 @@ The API will be available at `http://localhost:8000`.
 
 ---
 
+## Quick Start (Run All)
+
+You can start the backend, frontend, and the search service with a single command:
+
+```bash
+# Default (Tantivy)
+./scripts/run_dev.sh
+
+# Use Elasticsearch
+./scripts/run_dev.sh --es
+```
+
+---
+
 ## 3. Setup & Start Frontend
 
 The frontend is a React application built with Vite.
