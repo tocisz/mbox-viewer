@@ -210,6 +210,10 @@ def parse_date(date_str):
     if not date_str:
         return datetime.now()
     
+    # Convert Header object to string if necessary
+    if not isinstance(date_str, str):
+        date_str = str(date_str)
+        
     # Strip whitespace
     date_str = date_str.strip()
     if not date_str:
@@ -218,41 +222,33 @@ def parse_date(date_str):
     # Stage 1: Try standard email parser
     try:
         res = email.utils.parsedate_to_datetime(date_str)
-        if not isinstance(res, datetime):
-            logging.warning(f"parse_date returned non-datetime: {type(res)} value: {res}")
-        return res
+        if isinstance(res, datetime):
+            return res
     except Exception:
-        pass  # Continue to fallback stages
+        pass
     
     # Stage 2: Try dateutil parser (more flexible)
     try:
         from dateutil import parser as dateutil_parser
-        # Use fuzzy=False to avoid false positives
-        return dateutil_parser.parse(date_str, fuzzy=False)
+        # Use fuzzy=True if standard parsing failed
+        return dateutil_parser.parse(date_str, fuzzy=True)
     except Exception:
-        pass  # Continue to fallback stages
+        pass
     
     # Stage 3: Try custom patterns for common malformed formats
     try:
         # Pattern: DD-MM-YY or YY-MM-DD (ambiguous short dates)
-        # We'll try to interpret as DD-MM-YY first (European format common in emails)
         match = re.match(r'^(\d{2})-(\d{2})-(\d{2})$', date_str)
         if match:
             day, month, year = match.groups()
-            # Assume 20XX for years 00-49, 19XX for years 50-99
             year_int = int(year)
             full_year = 2000 + year_int if year_int < 50 else 1900 + year_int
             return datetime(full_year, int(month), int(day))
-        
-        # Pattern: Incomplete RFC date like "Wed, 14 May 2008 15" (missing minutes/seconds)
-        # Try fuzzy parsing with dateutil as last custom attempt
-        from dateutil import parser as dateutil_parser
-        return dateutil_parser.parse(date_str, fuzzy=True, default=datetime(2000, 1, 1))
     except Exception:
         pass
     
     # Stage 4: Last resort - return current time
-    logging.warning(f"parse_date failed for '{date_str}': All parsing strategies exhausted. Returning now()")
+    logging.warning(f"parse_date failed for '{date_str[:50]}...': All parsing strategies exhausted. Returning now()")
     return datetime.now()
 
 
@@ -265,20 +261,26 @@ def stream_mbox_messages(mbox_path):
     """
     with open(mbox_path, 'rb') as f:
         lines = []
+        from_line = None
         for line in f:
             if line.startswith(b'From '):
                 if lines:
                     # Use compat32 policy to avoid strict header validation
                     # This allows us to sanitize CR/LF later rather than failing on parse
                     msg = email.message_from_bytes(b''.join(lines), policy=email.policy.compat32)
+                    if from_line:
+                        msg['X-Mbox-From-Line'] = from_line.decode('utf-8', errors='replace').strip()
                     yield msg
                     lines = []
+                from_line = line
             else:
                 lines.append(line)
         
         # Yield the last message
         if lines:
             msg = email.message_from_bytes(b''.join(lines), policy=email.policy.compat32)
+            if from_line:
+                msg['X-Mbox-From-Line'] = from_line.decode('utf-8', errors='replace').strip()
             yield msg
 
 
@@ -298,7 +300,28 @@ def generate_docs(mbox_path, attachments_dir=None):
             subject = sanitize_header(message.get("Subject", ""))
             sender = sanitize_header(message.get("From", ""))
             recipients = sanitize_header(message.get("To", ""))
-            date_str = message.get("Date", "")
+            
+            # Date extraction with fallbacks (especially for Chat logs)
+            date_str = message.get("Date")
+            if not date_str:
+                # Try X-Received or Received headers
+                date_str = message.get("X-Received")
+                if not date_str:
+                    date_str = message.get("Received")
+                
+                # If it's a Received header, it might have "; <date>" at the end
+                if date_str and ';' in str(date_str):
+                    date_str = str(date_str).split(';')[-1].strip()
+                
+                # If still no date, use the mbox From line we preserved
+                if not date_str:
+                    from_line = message.get("X-Mbox-From-Line")
+                    if from_line and from_line.startswith("From "):
+                        # "From <addr> <day> <mon> <dd> <hh:mm:ss> <yyyy>"
+                        parts = from_line.split(' ', 2)
+                        if len(parts) > 2:
+                            date_str = parts[2]
+            
             labels = parse_labels(message.get("X-Gmail-Labels", ""))
             
             # Use generated ID if sanitized ID is empty
