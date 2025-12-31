@@ -5,7 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use chrono::{TimeZone, Utc};
+use chrono::{NaiveDate, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
@@ -134,7 +134,10 @@ async fn index_documents(
     for doc_data in docs {
         let date_parsed = chrono::DateTime::parse_from_rfc3339(&doc_data.date)
             .map(|dt| dt.with_timezone(&Utc))
-            .or_else(|_| Utc.datetime_from_str(&doc_data.date, "%Y-%m-%d %H:%M:%S"))
+            .or_else(|_| {
+                NaiveDateTime::parse_from_str(&doc_data.date, "%Y-%m-%d %H:%M:%S")
+                    .map(|ndt| ndt.and_utc())
+            })
             .unwrap_or_else(|_| Utc::now());
 
         let date = DateTime::from_timestamp_secs(date_parsed.timestamp());
@@ -260,15 +263,31 @@ async fn search(
             chrono::DateTime::parse_from_rfc3339(s)
                 .ok()
                 .map(|dt| dt.with_timezone(&Utc))
-                .or_else(|| Utc.datetime_from_str(s, "%Y-%m-%d").ok())
-                .or_else(|| Utc.datetime_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
+                .or_else(|| {
+                    NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .ok()
+                        .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc())
+                })
+                .or_else(|| {
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+                        .ok()
+                        .map(|ndt| ndt.and_utc())
+                })
         });
         let lte = range["lte"].as_str().and_then(|s| {
             chrono::DateTime::parse_from_rfc3339(s)
                 .ok()
                 .map(|dt| dt.with_timezone(&Utc))
-                .or_else(|| Utc.datetime_from_str(s, "%Y-%m-%d").ok())
-                .or_else(|| Utc.datetime_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
+                .or_else(|| {
+                    NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .ok()
+                        .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc())
+                })
+                .or_else(|| {
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+                        .ok()
+                        .map(|ndt| ndt.and_utc())
+                })
         });
 
         if gte.is_some() || lte.is_some() {
@@ -302,34 +321,25 @@ async fn search(
 
     if let Some("date") = sort_field_name {
         let field_name = "date".to_string();
-        if sort_order == Some("asc") {
-            let (total, top_docs) = searcher
-                .search(
-                    &final_query,
-                    &(
-                        Count,
-                        collector.order_by_fast_field::<DateTime>(field_name, tantivy::Order::Asc),
-                    ),
-                )
-                .unwrap();
-            total_count = total;
-            for (_val, doc_address) in top_docs {
-                doc_addresses.push(doc_address);
-            }
+        let order = if sort_order == Some("asc") {
+            tantivy::Order::Asc
         } else {
-            let (total, top_docs) = searcher
-                .search(
-                    &final_query,
-                    &(
-                        Count,
-                        collector.order_by_fast_field::<DateTime>(field_name, tantivy::Order::Desc),
-                    ),
-                )
-                .unwrap();
-            total_count = total;
-            for (_val, doc_address) in top_docs {
-                doc_addresses.push(doc_address);
-            }
+            tantivy::Order::Desc
+        };
+
+        let (total, top_docs) = searcher
+            .search(
+                &final_query,
+                &(
+                    Count,
+                    collector.order_by_fast_field::<DateTime>(field_name, order),
+                ),
+            )
+            .unwrap();
+
+        total_count = total;
+        for (_val, doc_address) in top_docs {
+            doc_addresses.push(doc_address);
         }
     } else {
         let (total, top_docs) = searcher.search(&final_query, &(Count, collector)).unwrap();
