@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Iterable
 from elasticsearch import Elasticsearch, helpers
 import os
 import logging
@@ -14,7 +14,7 @@ class SearchService(ABC):
         pass
 
     @abstractmethod
-    def index_documents(self, index_name: str, documents: List[Dict[str, Any]]):
+    def index_documents(self, index_name: str, documents: Iterable[Dict[str, Any]]):
         pass
 
     @abstractmethod
@@ -48,10 +48,8 @@ class ElasticsearchService(SearchService):
             self.es.indices.create(index=index_name, body=mapping)
             logging.info(f"Created index '{index_name}'")
 
-    def index_documents(self, index_name: str, documents: List[Dict[str, Any]]):
-        # We assume documents already have _index, _id etc if needed for bulk, 
-        # but the interface might need refinement if Tantivy handles it differently.
-        # For ES, we use helpers.bulk
+    def index_documents(self, index_name: str, documents: Iterable[Dict[str, Any]]):
+        # Elasticsearch's helpers.bulk accepts an iterator, so we just pass it along.
         helpers.bulk(self.es, documents, chunk_size=500)
 
     def search(self, index_name: str, query_body: Dict[str, Any]) -> Dict[str, Any]:
@@ -95,26 +93,59 @@ class TantivyServiceBridge(SearchService):
         logging.info(f"TantivyService: Creating index {index_name} (Not implemented)")
         pass
 
-    def index_documents(self, index_name: str, documents: List[Dict[str, Any]]):
-        # Forward documents to Rust service
-        logging.info(f"TantivyService: Indexing {len(documents)} documents to {index_name}")
-        # response = self.requests.post(f"{self.api_base_url}/index", json={"index": index_name, "docs": documents})
-        pass
+    def index_documents(self, index_name: str, documents: Iterable[Dict[str, Any]]):
+        logging.info(f"TantivyService: Indexing documents to {index_name}")
+        # Tantivy service expects a list of docs in the body
+        # We process the iterable in chunks to avoid memory issues and match the API
+        chunk_size = 100
+        current_chunk = []
+        for doc in documents:
+            # The doc coming from indexer.py has _source, _id, etc.
+            # We need to flatten it or extract what the Rust service expects.
+            # Rust service EmailDoc: {id, subject, from, to, date, labels, body_text, body_html, has_attachment, attachments}
+            src = doc.get("_source", {})
+            email_doc = {
+                "id": doc.get("_id") or src.get("original_id"),
+                "subject": src.get("subject", ""),
+                "from": src.get("from", ""),
+                "to": src.get("to", ""),
+                "date": str(src.get("date", "")),
+                "labels": src.get("labels", []),
+                "body_text": src.get("body_text", ""),
+                "body_html": src.get("body_html", ""),
+                "has_attachment": src.get("has_attachment", False),
+                "attachments": src.get("attachments", [])
+            }
+            current_chunk.append(email_doc)
+            
+            if len(current_chunk) >= chunk_size:
+                resp = self.requests.post(f"{self.api_base_url}/index", json=current_chunk)
+                resp.raise_for_status()
+                current_chunk = []
+        
+        if current_chunk:
+            resp = self.requests.post(f"{self.api_base_url}/index", json=current_chunk)
+            resp.raise_for_status()
 
     def search(self, index_name: str, query_body: Dict[str, Any]) -> Dict[str, Any]:
-        # Translate ES query DSL to what the Rust service expects (or just pass it along if the Rust service emulates ES)
         logging.info(f"TantivyService: Searching in {index_name}")
-        # response = self.requests.post(f"{self.api_base_url}/search", json={"index": index_name, "query": query_body})
+        response = self.requests.post(f"{self.api_base_url}/search", json=query_body)
+        if response.status_code == 200:
+            return response.json()
         return {"hits": {"total": {"value": 0}, "hits": []}}
 
     def get_document(self, index_name: str, doc_id: str) -> Dict[str, Any]:
         logging.info(f"TantivyService: Getting document {doc_id} from {index_name}")
-        # response = self.requests.get(f"{self.api_base_url}/doc/{doc_id}")
+        response = self.requests.get(f"{self.api_base_url}/doc/{doc_id}")
+        if response.status_code == 200:
+            return response.json()
         return {"_source": {}}
 
     def get_labels(self, index_name: str) -> List[str]:
         logging.info(f"TantivyService: Getting labels from {index_name}")
-        # response = self.requests.get(f"{self.api_base_url}/labels")
+        response = self.requests.get(f"{self.api_base_url}/labels")
+        if response.status_code == 200:
+            return response.json()
         return []
 
 def get_search_service() -> SearchService:

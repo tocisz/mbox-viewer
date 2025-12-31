@@ -407,7 +407,7 @@ def main():
     
     logging.info("Starting indexing...")
     try:
-        search_service.index_documents("emails", list(generate_docs(args.mbox, attachments_dir=args.attachments_dir)))
+        search_service.index_documents("emails", generate_docs(args.mbox, attachments_dir=args.attachments_dir))
         logging.info("Indexing complete.")
     except Exception as e:
         logging.error(f"Indexing failed: {e}")

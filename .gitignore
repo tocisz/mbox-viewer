@@ -26,3 +26,9 @@ attachments/
 *.tar.gz
 *.mbox
 *.log
+
+# Rust
+target/
+debug/
+release/
+search-service/tantivy_index

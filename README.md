@@ -11,16 +11,34 @@ Ensure you have the following installed:
 
 ---
 
-## 1. Start Elasticsearch
+## Search Service Backend
 
-The project uses a local Elasticsearch instance located in the root directory.
+The application supports two search backends. You can choose which one to use by setting the `SEARCH_SERVICE_TYPE` environment variable.
 
-```bash
-# From the project root
-./elasticsearch-8.17.0/bin/elasticsearch
-```
+### Option A: Elasticsearch (Legacy)
+1. **Prerequisites**: [Elasticsearch 8.17.0](https://www.elastic.co/downloads/elasticsearch) (included in repo).
+2. **Start**:
+   ```bash
+   ./scripts/start_es.sh
+   ```
+3. **Configure**:
+   ```bash
+   export SEARCH_SERVICE_TYPE=elasticsearch
+   export ES_HOST=http://localhost:9200
+   ```
 
-Wait until you see a log message indicating that Elasticsearch is "started" or "ready".
+### Option B: Tantivy (Recommended / Rust)
+1. **Prerequisites**: [Rust & Cargo](https://rustup.rs/).
+2. **Start**:
+   ```bash
+   ./scripts/start_tantivy.sh
+   ```
+   *This will build the service from `search-service/` and run it in the background on port 8001.*
+3. **Configure**:
+   ```bash
+   export SEARCH_SERVICE_TYPE=tantivy
+   export TANTIVY_API_URL=http://localhost:8001
+   ```
 
 ---
 
@@ -80,5 +98,7 @@ The frontend will be available at `http://localhost:5173`.
 ## Project Structure
 *   `backend/`: FastAPI server and MBOX indexer logic.
 *   `frontend/`: React + Vite web user interface.
+*   `search-service/`: Rust + Tantivy standalone search service.
+*   `scripts/`: Utility scripts for starting services.
 *   `elasticsearch-8.17.0/`: Local Elasticsearch instance.
 *   `Takeout/`: (Ignored) Gmail export data.
