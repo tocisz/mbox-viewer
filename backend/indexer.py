@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import logging
 from datetime import datetime
 import re
+import hashlib
 from search_service import get_search_service
 
 # Configure logging
@@ -295,7 +296,14 @@ def generate_docs(mbox_path, attachments_dir=None):
             
         try:
             # Get headers and sanitize to remove CR/LF characters
-            msg_id = sanitize_header(message.get("Message-ID", f"generated-{i}"))
+            raw_msg_id = message.get("Message-ID", f"generated-{i}")
+            msg_id = sanitize_header(raw_msg_id)
+            if not msg_id:
+                msg_id = f"generated-{i}"
+            
+            # Generate a short, deterministic ID (8-character hash)
+            short_id = hashlib.sha256(msg_id.encode('utf-8')).hexdigest()[:12]
+            
             subject = sanitize_header(message.get("Subject", ""))
             sender = sanitize_header(message.get("From", ""))
             recipients = sanitize_header(message.get("To", ""))
@@ -323,23 +331,20 @@ def generate_docs(mbox_path, attachments_dir=None):
             
             labels = parse_labels(message.get("X-Gmail-Labels", ""))
             
-            # Use generated ID if sanitized ID is empty
-            if not msg_id:
-                msg_id = f"generated-{i}"
-            
             body_html, body_text = get_body(message)
             
             # If no text body, try to create one from HTML for search
             if not body_text and body_html:
                 body_text = clean_html(body_html)
             
-            # Extract attachments
-            attachments = extract_attachments(message, msg_id, attachments_dir)
+            # Extract attachments using short_id for directory
+            attachments = extract_attachments(message, short_id, attachments_dir)
                 
             doc = {
                 "_index": "emails",
-                "_id": msg_id,
+                "_id": short_id,
                 "_source": {
+                    "original_id": msg_id,
                     "subject": subject,
                     "from": sender,
                     "to": recipients,
