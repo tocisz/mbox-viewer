@@ -1,10 +1,10 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
-from elasticsearch import Elasticsearch
 from pydantic import BaseModel
 from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 import os
+from search_service import get_search_service
 
 app = FastAPI()
 
@@ -17,7 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-es = Elasticsearch("http://localhost:9200")
+search_service = get_search_service()
 
 ATTACHMENTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "attachments")
 
@@ -48,28 +48,16 @@ class EmailDetail(BaseModel):
 
 @app.get("/health")
 def health():
-    if not es.ping():
-        raise HTTPException(status_code=503, detail="Elasticsearch not reachable")
+    if not search_service.health_check():
+        raise HTTPException(status_code=503, detail="Search service not reachable")
     return {"status": "ok"}
 
 @app.get("/labels", response_model=List[str])
 def get_labels():
-    # Aggregation to get unique labels
-    query = {
-        "size": 0,
-        "aggs": {
-            "unique_labels": {
-                "terms": {"field": "labels", "size": 1000}
-            }
-        }
-    }
     try:
-        res = es.search(index="emails", body=query)
-        buckets = res["aggregations"]["unique_labels"]["buckets"]
-        # Sort labels alphabetically
-        return sorted([b["key"] for b in buckets])
+        return search_service.get_labels("emails")
     except Exception as e:
-        print(e)
+        print(f"Error getting labels: {e}")
         return []
 
 @app.get("/search", response_model=dict)
@@ -124,7 +112,7 @@ def search_emails(
         "_source": ["subject", "from", "date", "labels", "body_text", "has_attachment"] # Don't fetch full HTML for list
     }
     
-    res = es.search(index="emails", body=query_body)
+    res = search_service.search(index_name="emails", query_body=query_body)
     
     emails = []
     for hit in res["hits"]["hits"]:
@@ -151,7 +139,7 @@ def search_emails(
 @app.get("/email/{email_id}", response_model=EmailDetail)
 def get_email(email_id: str):
     try:
-        res = es.get(index="emails", id=email_id)
+        res = search_service.get_document(index_name="emails", doc_id=email_id)
         src = res["_source"]
         return {
             "id": res["_id"],

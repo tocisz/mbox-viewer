@@ -4,12 +4,11 @@ import os
 import argparse
 import email
 import email.policy
-from elasticsearch import Elasticsearch, helpers
-from elasticsearch.helpers import BulkIndexError
 from bs4 import BeautifulSoup
 import logging
 from datetime import datetime
 import re
+from search_service import get_search_service
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -358,36 +357,31 @@ def generate_docs(mbox_path, attachments_dir=None):
 
 
 
-def create_index(es, reindex=False):
-    if reindex and es.indices.exists(index="emails"):
-        logging.info("Deleting existing index 'emails' for reindexing...")
-        es.indices.delete(index="emails")
-
-    if not es.indices.exists(index="emails"):
-        es.indices.create(index="emails", body={
-            "mappings": {
-                "properties": {
-                    "subject": {"type": "text"},
-                    "from": {"type": "text"},
-                    "to": {"type": "text"},
-                    "date": {"type": "date"},
-                    "labels": {"type": "keyword"},
-                    "body_text": {"type": "text"},
-                    "body_html": {"type": "text", "index": False}, # Changed from keyword to text, not indexed
-                    "has_attachment": {"type": "boolean"},
-                    "attachments": {
-                        "type": "nested",
-                        "properties": {
-                            "filename": {"type": "keyword"},
-                            "size": {"type": "long"},
-                            "content_type": {"type": "keyword"},
-                            "path": {"type": "keyword"}
-                        }
+def create_index(search_service, reindex=False):
+    mapping = {
+        "mappings": {
+            "properties": {
+                "subject": {"type": "text"},
+                "from": {"type": "text"},
+                "to": {"type": "text"},
+                "date": {"type": "date"},
+                "labels": {"type": "keyword"},
+                "body_text": {"type": "text"},
+                "body_html": {"type": "text", "index": False}, # Changed from keyword to text, not indexed
+                "has_attachment": {"type": "boolean"},
+                "attachments": {
+                    "type": "nested",
+                    "properties": {
+                        "filename": {"type": "keyword"},
+                        "size": {"type": "long"},
+                        "content_type": {"type": "keyword"},
+                        "path": {"type": "keyword"}
                     }
                 }
             }
-        })
-        logging.info("Created index 'emails'")
+        }
+    }
+    search_service.create_index(index_name="emails", mapping=mapping, reindex=reindex)
 
 
 def main():
@@ -398,21 +392,20 @@ def main():
     parser.add_argument("--attachments-dir", help="Directory to store attachment files")
     args = parser.parse_args()
 
-    es = Elasticsearch(args.es_host)
+    search_service = get_search_service()
     
-    if not es.ping():
-        logging.error(f"Cannot connect to Elasticsearch at {args.es_host}. Is it running?")
+    if not search_service.health_check():
+        logging.error(f"Cannot connect to the search service. Is it running?")
         sys.exit(1)
         
-    create_index(es, reindex=args.reindex)
+    create_index(search_service, reindex=args.reindex)
     
     logging.info("Starting indexing...")
     try:
-        helpers.bulk(es, generate_docs(args.mbox, attachments_dir=args.attachments_dir), chunk_size=500)
-
+        search_service.index_documents("emails", list(generate_docs(args.mbox, attachments_dir=args.attachments_dir)))
         logging.info("Indexing complete.")
-    except BulkIndexError as e:
-        logging.error(f"{len(e.errors)} documents failed to index. First error: {e.errors[0]}")
+    except Exception as e:
+        logging.error(f"Indexing failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
