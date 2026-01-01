@@ -56,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     schema_builder.add_text_field("to", TEXT | STORED);
     schema_builder.add_date_field("date", STORED | INDEXED | FAST);
     schema_builder.add_facet_field("labels", FacetOptions::default().set_stored());
-    schema_builder.add_text_field("body_text", TEXT);
+    schema_builder.add_text_field("body_text", TEXT | STORED);
     schema_builder.add_text_field("body_html", STORED);
     schema_builder.add_bool_field("has_attachment", STORED | INDEXED);
     schema_builder.add_json_field("attachments", STORED);
@@ -392,7 +392,7 @@ async fn search(
                 "from": extract_string(&doc_obj["from"]),
                 "date": extract_string(&doc_obj["date"]),
                 "labels": labels, 
-                "body_text": "",
+                "body_text": extract_string(&doc_obj["body_text"]),
                 "has_attachment": if doc_obj["has_attachment"].is_array() { doc_obj["has_attachment"][0].as_bool().unwrap_or(false) } else { doc_obj["has_attachment"].as_bool().unwrap_or(false) },
             }
         }));
@@ -455,6 +455,7 @@ async fn get_document(
                 "to": extract_string(&doc_obj["to"]),
                 "date": extract_string(&doc_obj["date"]),
                 "labels": labels,
+                "body_text": extract_string(&doc_obj["body_text"]),
                 "body_html": extract_string(&doc_obj["body_html"]),
                 "attachments": if doc_obj["attachments"].is_array() { doc_obj["attachments"][0].clone() } else { doc_obj["attachments"].clone() },
             }
