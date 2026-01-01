@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State, Query as AxumQuery},
+    extract::{Path, Query as AxumQuery, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post},
@@ -9,7 +9,6 @@ use chrono::{NaiveDate, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
-use std::collections::HashMap;
 use tantivy::collector::{Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, BooleanQuery, Occur, QueryParser, RangeQuery, TermQuery};
 use tantivy::schema::{
@@ -62,7 +61,8 @@ async fn main() -> anyhow::Result<()> {
     std::fs::create_dir_all(index_path)?;
 
     // Attachments dir from env or default
-    let attachments_dir = std::env::var("ATTACHMENTS_DIR").unwrap_or_else(|_| "../attachments".to_string());
+    let attachments_dir =
+        std::env::var("ATTACHMENTS_DIR").unwrap_or_else(|_| "../attachments".to_string());
     std::fs::create_dir_all(&attachments_dir)?;
 
     let mut schema_builder = Schema::builder();
@@ -99,7 +99,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/index", post(index_documents))
-        .route("/search", get(search_emails_get).post(search_raw))
+        .route("/search", get(search_emails_get))
         .route("/labels", get(get_labels))
         .route("/email/:id", get(get_email_detail)) // Matches server.py endpoint
         .route("/doc/:id", get(get_document_raw)) // Legacy/Internal
@@ -110,7 +110,10 @@ async fn main() -> anyhow::Result<()> {
         .layer(axum::extract::DefaultBodyLimit::max(50_000_000))
         .with_state(state);
 
-    let port: u16 = std::env::var("PORT").unwrap_or("8001".to_string()).parse().unwrap_or(8001);
+    let port: u16 = std::env::var("PORT")
+        .unwrap_or("8001".to_string())
+        .parse()
+        .unwrap_or(8001);
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     info!("Email Server listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -234,12 +237,11 @@ async fn search_emails_get(
 ) -> impl IntoResponse {
     let searcher = state.reader.searcher();
     let schema = &state.schema;
-    
+
     let page = params.page.unwrap_or(1);
     let size = params.size.unwrap_or(20);
     let from = (page - 1) * size;
 
-    let id_field = schema.get_field("id").unwrap();
     let subject_field = schema.get_field("subject").unwrap();
     let from_field = schema.get_field("from").unwrap();
     let to_field = schema.get_field("to").unwrap();
@@ -257,8 +259,8 @@ async fn search_emails_get(
                 vec![subject_field, from_field, body_text_field, to_field],
             );
             // Boost subject^2
-            // Tantivy QueryParser supports boosting syntax in the query string, 
-            // but here we just pass fields. 
+            // Tantivy QueryParser supports boosting syntax in the query string,
+            // but here we just pass fields.
             // Ideally we'd configure boosts on fields, but for now standard parsing.
             match query_parser.parse_query(&q) {
                 Ok(query) => filter_queries.push((Occur::Must, query)),
@@ -270,9 +272,9 @@ async fn search_emails_get(
         // If nothing, match all?
         // server.py: defaults to match nothing unless label or date provided?
         // Actually server.py: "must_clauses: []". if empty, it's boolean query.
-        // But if no filters either? 
+        // But if no filters either?
         if params.label.is_none() && params.start_date.is_none() && params.end_date.is_none() {
-             filter_queries.push((Occur::Must, Box::new(AllQuery)));
+            filter_queries.push((Occur::Must, Box::new(AllQuery)));
         }
     }
 
@@ -280,26 +282,58 @@ async fn search_emails_get(
     if let Some(raw_label) = params.label {
         let label_lower = raw_label.to_lowercase();
         if label_lower != "all" {
-             let actual_label = if label_lower == "inbox" { "Inbox" } else if label_lower == "sent" { "Sent" } else { &raw_label };
-             
-             let facet = Facet::from(&format!("/{}", actual_label));
-             let label_query = TermQuery::new(
-                 Term::from_facet(labels_field, &facet),
-                 IndexRecordOption::Basic,
-             );
-             filter_queries.push((Occur::Must, Box::new(label_query)));
+            let actual_label = if label_lower == "inbox" {
+                "Inbox"
+            } else if label_lower == "sent" {
+                "Sent"
+            } else {
+                &raw_label
+            };
+
+            let facet = Facet::from(&format!("/{}", actual_label));
+            let label_query = TermQuery::new(
+                Term::from_facet(labels_field, &facet),
+                IndexRecordOption::Basic,
+            );
+            filter_queries.push((Occur::Must, Box::new(label_query)));
         }
     }
 
     // Date Range
     if params.start_date.is_some() || params.end_date.is_some() {
-        let start = params.start_date.as_ref()
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        let start = params
+            .start_date
+            .as_ref()
+            .and_then(|s| {
+                chrono::DateTime::parse_from_rfc3339(s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .or_else(|| {
+                        NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                            .ok()
+                            .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc())
+                    })
+            })
             .map(|dt| DateTime::from_timestamp_secs(dt.timestamp()))
             .unwrap_or(DateTime::from_timestamp_secs(0));
-            
-        let end = params.end_date.as_ref()
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+
+        let end = params
+            .end_date
+            .as_ref()
+            .and_then(|s| {
+                chrono::DateTime::parse_from_rfc3339(s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .or_else(|| {
+                        NaiveDate::parse_from_str(s, "%Y-%m-%d").ok().map(|d| {
+                            d.succ_opt()
+                                .unwrap()
+                                .and_hms_opt(0, 0, 0)
+                                .unwrap()
+                                .and_utc()
+                        })
+                    })
+            })
             .map(|dt| DateTime::from_timestamp_secs(dt.timestamp()))
             .unwrap_or(DateTime::from_timestamp_secs(2147483647));
 
@@ -322,7 +356,7 @@ async fn search_emails_get(
         let retrieved_doc: TantivyDocument = searcher.doc(doc_address).unwrap();
         let doc_json = retrieved_doc.to_json(&state.schema);
         let doc_obj: serde_json::Value = serde_json::from_str(&doc_json).unwrap();
-        
+
         // Map to format
         let labels: Vec<String> = doc_obj["labels"]
             .as_array()
@@ -330,9 +364,12 @@ async fn search_emails_get(
             .iter()
             .filter_map(|v| v.as_str().map(|s| s.trim_start_matches('/').to_string()))
             .collect();
-            
-        let snippet = extract_string(&doc_obj["body_text"]).chars().take(200).collect::<String>();
-        
+
+        let snippet = extract_string(&doc_obj["body_text"])
+            .chars()
+            .take(200)
+            .collect::<String>();
+
         hits.push(serde_json::json!({
             "id": extract_string(&doc_obj["id"]),
             "subject": extract_string(&doc_obj["subject"]),
@@ -353,17 +390,6 @@ async fn search_emails_get(
             "items": hits
         })),
     )
-}
-
-// Internal raw search (matches old POST /search)
-async fn search_raw(
-    State(state): State<AppState>,
-    Json(query_body): Json<serde_json::Value>,
-) -> impl IntoResponse {
-    // ... Implement logic similar to before if needed by other tools, 
-    // or just redirect logic. For now kept for compatibility if needed.
-    // ... (omitted for brevity, can restore if essential)
-    (StatusCode::OK, Json(serde_json::json!({})))
 }
 
 async fn get_labels(State(state): State<AppState>) -> impl IntoResponse {
@@ -401,12 +427,20 @@ async fn get_email_detail(
             .iter()
             .filter_map(|v| v.as_str().map(|s| s.trim_start_matches('/').to_string()))
             .collect();
-        
+
         let body_text = extract_string(&doc_obj["body_text"]);
         let body_html = extract_string(&doc_obj["body_html"]);
-        let final_html = if !body_html.is_empty() { body_html } else { format!("<pre>{}</pre>", body_text) };
+        let final_html = if !body_html.is_empty() {
+            body_html
+        } else {
+            format!("<pre>{}</pre>", body_text)
+        };
 
-        let attachments = if doc_obj["attachments"].is_array() { doc_obj["attachments"][0].clone() } else { doc_obj["attachments"].clone() };
+        let attachments = if doc_obj["attachments"].is_array() {
+            doc_obj["attachments"][0].clone()
+        } else {
+            doc_obj["attachments"].clone()
+        };
 
         let response = serde_json::json!({
             "id": doc_id,

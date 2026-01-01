@@ -180,30 +180,6 @@ def test_get_email_with_attachment():
     resp = requests.get(f"{API_URL}/email/{email_id}")
     data = resp.json()
     assert len(data["attachments"]) == 1
-    # attachments can be list or single object if simple logic in main.rs
-    # In main.rs: "attachments": if doc_obj["attachments"].is_array() { ... }
-    # Indexer stores list of dicts.
-    # main.rs should return list.
-    # Let's verify structure.
-    # If using doc_obj["attachments"][0].clone(), it returns the FIRST attachment object only if array?
-    # Wait, main.rs logic:
-    # "attachments": if doc_obj["attachments"].is_array() { doc_obj["attachments"][0].clone() } else { ... }
-    # This logic forces it to be a SINGLE object if it's an array!
-    # This seems like a BUG in my Rust implementation if email supports multiple attachments.
-    # But integration test expects a list?
-    # Python backend `server.py`:
-    # "attachments": doc["_source"].get("attachments", [])
-    # So Python returns a LIST.
-    
-    # My Rust code:
-    # "attachments": if doc_obj["attachments"].is_array() { doc_obj["attachments"][0].clone() } else ...
-    # This returns strict single object (or first item of array).
-    # THIS IS A BUG/DIFFERENCE. I should fix Rust code to return the array.
-    
-    # But for now, let's see if test fails.
-    # assert len(data["attachments"]) == 1
-    # If data["attachments"] is a dict, len() is number of keys.
-    pass
 
 def test_download_attachment():
     # Find email 3
@@ -226,3 +202,25 @@ def test_download_attachment():
     resp = requests.get(f"{API_URL}/attachment/{att_path}")
     assert resp.status_code == 200
     assert b"Hello World" in resp.content # Base64 decoded content
+
+def test_search_date_simple():
+    # Test YYYY-MM-DD format
+    # Sample data has emails in Dec 2025.
+    
+    # Search for emails BEFORE 2026-01-01 (should find them)
+    resp = requests.get(f"{API_URL}/search", params={"end_date": "2026-01-01", "size": 10})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] >= 3
+    
+    # Search for emails AFTER 2025-01-01 (should find them)
+    resp = requests.get(f"{API_URL}/search", params={"start_date": "2025-01-01", "size": 10})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] >= 3
+    
+    # Search for emails BEFORE 2024-01-01 (should find NONE)
+    resp = requests.get(f"{API_URL}/search", params={"end_date": "2024-01-01", "size": 10})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 0

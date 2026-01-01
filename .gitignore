@@ -33,5 +33,4 @@ target/
 debug/
 release/
 tantivy_index
-email-server/tantivy_index
-email-server/tantivy_index.backup
+email-server/tantivy_index*
