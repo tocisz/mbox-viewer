@@ -1,4 +1,4 @@
-import { useEmailDetail } from '../hooks';
+import { useEmailDetail, API_Base } from '../hooks';
 
 export default function EmailDetail({ id, onClose, onSelectLabel }) {
     const { email, loading } = useEmailDetail(id);
@@ -64,7 +64,7 @@ export default function EmailDetail({ id, onClose, onSelectLabel }) {
                                     {(att.size / 1024).toFixed(1)} KB
                                 </div>
                                 <a
-                                    href={`http://localhost:8000/attachment/${att.path}`}
+                                    href={`${API_Base}/attachment/${att.path}`}
                                     className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
                                     download={att.filename}
                                     target="_blank"

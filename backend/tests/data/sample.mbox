@@ -1,0 +1,50 @@
+From sender@example.com Tue Dec 30 12:00:00 2025
+Message-ID: <email1@example.com>
+Date: Tue, 30 Dec 2025 12:00:00 +0000
+From: Sender One <sender@example.com>
+To: Recipient <recipient@example.com>
+Subject: Test Email 1
+Content-Type: text/plain; charset="utf-8"
+X-Gmail-Labels: Inbox,Important
+
+This is a plain text email.
+It has multiple lines.
+
+From sender@example.com Tue Dec 30 13:00:00 2025
+Message-ID: <email2@example.com>
+Date: Tue, 30 Dec 2025 13:00:00 +0000
+From: Sender One <sender@example.com>
+To: Recipient <recipient@example.com>
+Subject: Test Email 2 - HTML
+Content-Type: text/html; charset="utf-8"
+X-Gmail-Labels: Sent
+
+<html>
+  <body>
+    <p>This is an <b>HTML</b> email.</p>
+  </body>
+</html>
+
+From sender@example.com Tue Dec 30 14:00:00 2025
+Message-ID: <email3@example.com>
+Date: Tue, 30 Dec 2025 14:00:00 +0000
+From: Sender Two <sender2@example.com>
+To: Recipient <recipient@example.com>
+Subject: Test Email 3 - Attachment
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary123"
+X-Gmail-Labels: Inbox
+
+--boundary123
+Content-Type: text/plain; charset="utf-8"
+
+Please find attached.
+
+--boundary123
+Content-Type: text/plain; name="test.txt"
+Content-Disposition: attachment; filename="test.txt"
+Content-Transfer-Encoding: base64
+
+SGVsbG8gV29ybGQh
+
+--boundary123--

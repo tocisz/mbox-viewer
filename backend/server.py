@@ -19,7 +19,7 @@ app.add_middleware(
 
 search_service = get_search_service()
 
-ATTACHMENTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "attachments")
+ATTACHMENTS_DIR = os.getenv("ATTACHMENTS_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "attachments"))
 
 class Attachment(BaseModel):
     filename: str

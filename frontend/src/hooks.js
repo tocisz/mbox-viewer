@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 
-const API_Base = "http://localhost:8000";
+const API_Base = "http://localhost:8001";
+export { API_Base };
 
 export const useLabels = () => {
     const [labels, setLabels] = useState([]);
