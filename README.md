@@ -7,7 +7,7 @@ A local web application to view and search emails from a Gmail MBOX export (`Tak
 Ensure you have the following installed:
 - **Python 3.10+**
 - **Node.js 18+** & **npm**
-- **Elasticsearch 8.17.0** (Already included in the repository)
+- **Elasticsearch 8.17.0** (Required for Elasticsearch backend)
 
 ---
 
@@ -16,8 +16,9 @@ Ensure you have the following installed:
 The application supports two search backends. You can choose which one to use by setting the `SEARCH_SERVICE_TYPE` environment variable.
 
 ### Option A: Elasticsearch (Legacy)
-1. **Prerequisites**: [Elasticsearch 8.17.0](https://www.elastic.co/downloads/elasticsearch) (included in repo).
-2. **Start**:
+1. **Prerequisites**: [Elasticsearch 8.17.0](https://www.elastic.co/downloads/elasticsearch).
+2. **Setup**: Download and extract Elasticsearch 8.17.0 to the root directory (so that the `elasticsearch-8.17.0/` folder is present).
+3. **Start**:
    ```bash
    ./scripts/start_es.sh
    ```
@@ -114,5 +115,4 @@ The frontend will be available at `http://localhost:5173`.
 *   `frontend/`: React + Vite web user interface.
 *   `search-service/`: Rust + Tantivy standalone search service.
 *   `scripts/`: Utility scripts for starting services.
-*   `elasticsearch-8.17.0/`: Local Elasticsearch instance.
 *   `Takeout/`: (Ignored) Gmail export data.
