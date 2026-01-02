@@ -56,7 +56,7 @@ Before you can search, you must index your MBOX data. The indexer is now built i
    # Replace path with your MBOX file
    # Note: --attachments-dir is required to extract and serve attachments.
    # It should match the directory served by the email-server (default: "attachments")
-   cargo run --release -- index --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox" --attachments-dir "attachments"
+   cargo run --release -- index --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox" --attachments-dir "../attachments"
    ```
 
 3. **Start the Email Server**:
