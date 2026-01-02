@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use tracing::{error, info};
 
 use crate::common::EmailDoc;
+use scraper::{Html, Node};
 
 pub async fn run_indexer(
     mbox_path: String,
@@ -222,7 +223,7 @@ fn process_email_content(
     let (body_text, body_html, attachments) = extract_parts(&parsed, &short_id, attachments_dir)?;
 
     let final_body_text = if body_text.is_empty() && !body_html.is_empty() {
-        html2text::from_read(body_html.as_bytes(), 80)
+        clean_html(&body_html)
     } else {
         body_text
     };
@@ -239,6 +240,38 @@ fn process_email_content(
         has_attachment: !attachments.is_empty(),
         attachments: serde_json::to_value(attachments).unwrap_or(serde_json::json!([])),
     })
+}
+
+fn clean_html(html: &str) -> String {
+    let document = Html::parse_document(html);
+    let mut text = String::new();
+    traverse_node(document.tree.root(), &mut text);
+    text
+}
+
+fn traverse_node(node: ego_tree::NodeRef<scraper::Node>, output: &mut String) {
+    match node.value() {
+        Node::Text(t) => {
+            let s = t.trim();
+            if !s.is_empty() {
+                if !output.is_empty() {
+                    output.push(' ');
+                }
+                output.push_str(s);
+            }
+        }
+        Node::Element(e) => {
+            let name = e.name();
+            if name == "script" || name == "style" {
+                return;
+            }
+        }
+        _ => {}
+    }
+
+    for child in node.children() {
+        traverse_node(child, output);
+    }
 }
 
 fn sanitize_header(val: &str) -> String {
