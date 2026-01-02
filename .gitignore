@@ -18,6 +18,7 @@ yarn-debug.log*
 # Data & Archives
 Takeout/
 attachments*
+tantivy_index*
 *.tar.gz
 *.mbox
 !tests/data/*.mbox
@@ -27,4 +28,3 @@ attachments*
 target/
 debug/
 release/
-tantivy_index*
