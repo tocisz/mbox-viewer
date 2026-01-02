@@ -7,26 +7,19 @@ A local web application to view and search emails from a Gmail MBOX export (`Tak
 Ensure you have the following installed:
 - **Rust & Cargo** (For backend & indexing)
 - **Node.js 18+** & **npm** (For frontend)
-- **Rust & Cargo** (For backend)
 
 ---
 
 ## 1. Environment Setup
 
-### Install Dependencies
-
-1. **Backend (Rust)**:
-   Ensure Rust is installed: [https://rustup.rs/](https://rustup.rs/)
-
-2. **Indexer (Python)**:
+3. **Tests (Python)**:
    ```bash
-   cd backend
    python3 -m venv .venv
    source .venv/bin/activate
    pip install -r requirements.txt
    ```
 
-3. **Frontend (React)**:
+4. **Frontend (React)**:
    ```bash
    cd frontend
    npm install
@@ -72,11 +65,7 @@ Before you can search, you must index your MBOX data. The indexer is now built i
 
 ## Project Structure
 *   `email-server/`: Rust-based backend (API + File Serving + Search).
-*   `backend/`: Python scripts for data indexing (migrated from legacy API).
 *   `frontend/`: React + Vite web user interface.
+*   `tests/`: Integration tests and sample data.
 *   `scripts/`: Utility scripts.
 *   `Takeout/`: (Ignored) Gmail export data.
-
-## Legacy (Python Backend)
-*The legacy Python backend (`server.py`) running on port 8000 is deprecated.*
-To run the legacy stack, use: `./scripts/run_dev.sh`.

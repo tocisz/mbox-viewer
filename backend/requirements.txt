@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-elasticsearch<9.0.0
-beautifulsoup4
-lxml
-python-multipart
-python-dateutil

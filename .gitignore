@@ -25,7 +25,7 @@ Takeout/
 attachments*
 *.tar.gz
 *.mbox
-!backend/tests/data/*.mbox
+!tests/data/*.mbox
 *.log
 
 # Rust

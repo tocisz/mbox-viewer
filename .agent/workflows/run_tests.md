@@ -11,5 +11,5 @@ description: Run backend integration tests to verify system functionality
 2. Run the Python integration tests.
    ```bash
    # Use the virtual environment Python to run pytest
-   ./.venv/bin/pytest backend/tests/integration_tests.py
+   .venv/bin/pytest tests/integration_tests.py
    ```

@@ -8,15 +8,12 @@ import shutil
 import signal
 from pathlib import Path
 
-# Add backend directory to path
-BACKEND_DIR = Path(__file__).parent.parent
-sys.path.append(str(BACKEND_DIR))
-
 # Config for tests
+ROOT_DIR = Path(__file__).parent.parent
 TEST_PORT = 8002
 API_URL = f"http://localhost:{TEST_PORT}"
-SAMPLE_MBOX = BACKEND_DIR / "tests" / "data" / "sample.mbox"
-TEST_ATTACHMENTS_DIR = BACKEND_DIR / "tests" / "data" / "attachments"
+SAMPLE_MBOX = ROOT_DIR / "tests" / "data" / "sample.mbox"
+TEST_ATTACHMENTS_DIR = ROOT_DIR / "tests" / "data" / "attachments"
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_environment():
@@ -31,7 +28,7 @@ def setup_environment():
     TEST_ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
     
     # Clean run env
-    TEST_RUN_DIR = BACKEND_DIR / "tests" / "run_env"
+    TEST_RUN_DIR = ROOT_DIR / "tests" / "run_env"
     if TEST_RUN_DIR.exists():
         shutil.rmtree(TEST_RUN_DIR)
     TEST_RUN_DIR.mkdir(parents=True, exist_ok=True)
@@ -39,9 +36,8 @@ def setup_environment():
     # Index Data (DIRECTLY)
     print(f"Indexing data directly...")
     idx_env = os.environ.copy()
-    idx_env["PYTHONPATH"] = str(BACKEND_DIR)
     
-    binary_path = BACKEND_DIR / "../email-server/target/release/email-server"
+    binary_path = ROOT_DIR / "email-server" / "target" / "release" / "email-server"
     if not binary_path.exists():
         pytest.fail(f"Binary not found at {binary_path}")
 
