@@ -1,0 +1,7 @@
+[build]
+target = "index.html"
+
+[[hooks]]
+stage = "pre_build"
+command = "sh"
+command_arguments = ["-c", "npx tailwindcss -i style/input.css -o style/output.css"]

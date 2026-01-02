@@ -5,8 +5,9 @@ A local web application to view and search emails from a Gmail MBOX export (`Tak
 ## Prerequisites
 
 Ensure you have the following installed:
-- **Rust & Cargo** (For backend & indexing)
-- **Node.js 18+** & **npm** (For frontend)
+- **Rust & Cargo** (For backend, frontend & indexing)
+- **Trunk** (`cargo install trunk`) - For building the frontend
+
 
 ---
 
@@ -39,7 +40,8 @@ The easiest way to run the application (Backend + Frontend) is using the provide
 ```
 This starts:
 - **Email Server (Rust)** on `http://localhost:8001`
-- **Frontend** on `http://localhost:5173`
+- The frontend is served directly by the backend at the same URL.
+
 
 ---
 
@@ -68,7 +70,8 @@ Before you can search, you must index your MBOX data. The indexer is now built i
 
 ## Project Structure
 *   `email-server/`: Rust-based backend (API + File Serving + Search).
-*   `frontend/`: React + Vite web user interface.
+*   `frontend-rust/`: Rust (Leptos) web user interface.
+
 *   `tests/`: Integration tests and sample data.
 *   `scripts/`: Utility scripts.
 *   `Takeout/`: (Ignored) Gmail export data.

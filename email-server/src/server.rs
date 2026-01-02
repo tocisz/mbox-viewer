@@ -62,6 +62,9 @@ pub async fn run_server(port: u16, attachments_dir: String) -> anyhow::Result<()
         .route("/email/:id", get(get_email_detail))
         .route("/doc/:id", get(get_document_raw))
         .nest_service("/attachment", ServeDir::new(attachments_dir))
+        .fallback_service(ServeDir::new("../frontend-rust/dist").fallback(
+            tower_http::services::ServeFile::new("../frontend-rust/dist/index.html"),
+        ))
         .layer(CorsLayer::permissive())
         .layer(axum::extract::DefaultBodyLimit::max(50_000_000))
         .with_state(state);
