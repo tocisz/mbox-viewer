@@ -5,114 +5,76 @@ A local web application to view and search emails from a Gmail MBOX export (`Tak
 ## Prerequisites
 
 Ensure you have the following installed:
-- **Python 3.10+**
-- **Node.js 18+** & **npm**
-- **Elasticsearch 8.17.0** (Required for Elasticsearch backend)
+- **Python 3.10+** (For indexing)
+- **Node.js 18+** & **npm** (For frontend)
+- **Rust & Cargo** (For backend)
 
 ---
 
-## Search Service Backend
+## 1. Environment Setup
 
-The application supports two search backends. You can choose which one to use by setting the `SEARCH_SERVICE_TYPE` environment variable.
+### Install Dependencies
 
-### Option A: Elasticsearch (Legacy)
-1. **Prerequisites**: [Elasticsearch 8.17.0](https://www.elastic.co/downloads/elasticsearch).
-2. **Setup**: Download and extract Elasticsearch 8.17.0 to the root directory (so that the `elasticsearch-8.17.0/` folder is present).
-3. **Start**:
+1. **Backend (Rust)**:
+   Ensure Rust is installed: [https://rustup.rs/](https://rustup.rs/)
+
+2. **Indexer (Python)**:
    ```bash
-   ./scripts/start_es.sh
-   ```
-3. **Configure**:
-   ```bash
-   export SEARCH_SERVICE_TYPE=elasticsearch
-   export ES_HOST=http://localhost:9200
+   cd backend
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
    ```
 
-### Option B: Tantivy (Recommended / Rust)
-1. **Prerequisites**: [Rust & Cargo](https://rustup.rs/).
-2. **Start**:
+3. **Frontend (React)**:
    ```bash
-   ./scripts/start_tantivy.sh
-   ```
-   *This will build the service from `search-service/` and run it in the background on port 8001.*
-3. **Configure**:
-   ```bash
-   export SEARCH_SERVICE_TYPE=tantivy
-   export TANTIVY_API_URL=http://localhost:8001
+   cd frontend
+   npm install
    ```
 
 ---
 
-## 2. Setup & Start Backend
+## 2. Quick Start (Recommended)
 
-The backend is built with FastAPI and runs on Python.
-
-### Setup Environment
-```bash
-# Navigate to backend directory
-cd backend
-
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### Index Your MBOX File
-If you haven't indexed your data yet, run the indexer. Replace the path with your actual MBOX file location.
+The easiest way to run the application (Backend + Frontend) is using the provided script:
 
 ```bash
-# Ensure you are in the backend directory with .venv activated
-python indexer.py --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox"
+./scripts/run_dev_rust.sh
 ```
-
-### Start API Server
-```bash
-# Ensure you are in the backend directory with .venv activated
-uvicorn server:app --reload
-```
-The API will be available at `http://localhost:8000`.
+This starts:
+- **Email Server (Rust)** on `http://localhost:8001`
+- **Frontend** on `http://localhost:5173`
 
 ---
 
-## Quick Start (Run All)
+## 3. Index Your MBOX File
 
-You can start the backend, frontend, and the search service with a single command:
+Before you can search, you must index your MBOX data. The indexer is a Python script that reads the MBOX file and pushes data to the running Rust server.
 
-```bash
-# Default (Tantivy)
-./scripts/run_dev.sh
+1. **Start the Email Server**:
+   ```bash
+   # In a separate terminal
+   cd email-server
+   cargo run --release
+   ```
 
-# Use Elasticsearch
-./scripts/run_dev.sh --es
-```
-
----
-
-## 3. Setup & Start Frontend
-
-The frontend is a React application built with Vite.
-
-### Setup & Run
-```bash
-# Navigate to frontend directory
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-The frontend will be available at `http://localhost:5173`.
+2. **Run Indexer**:
+   ```bash
+   cd backend
+   source .venv/bin/activate
+   # Replace path with your MBOX file
+   python indexer.py --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox"
+   ```
 
 ---
 
 ## Project Structure
-*   `backend/`: FastAPI server and MBOX indexer logic.
+*   `email-server/`: Rust-based backend (API + File Serving + Search).
+*   `backend/`: Python scripts for data indexing (migrated from legacy API).
 *   `frontend/`: React + Vite web user interface.
-*   `search-service/`: Rust + Tantivy standalone search service.
-*   `scripts/`: Utility scripts for starting services.
+*   `scripts/`: Utility scripts.
 *   `Takeout/`: (Ignored) Gmail export data.
+
+## Legacy (Python Backend)
+*The legacy Python backend (`server.py`) running on port 8000 is deprecated.*
+To run the legacy stack, use: `./scripts/run_dev.sh`.
