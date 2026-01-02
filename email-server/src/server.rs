@@ -193,6 +193,11 @@ async fn search_emails_get(
         filter_queries.push((Occur::Must, Box::new(range_query)));
     }
 
+    // If no filters are applied (e.g., label="ALL" acts as no label), default to AllQuery
+    if filter_queries.is_empty() {
+        filter_queries.push((Occur::Must, Box::new(AllQuery)));
+    }
+
     let final_query = BooleanQuery::new(filter_queries);
 
     let collector = TopDocs::with_limit(size)
