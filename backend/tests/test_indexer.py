@@ -1,14 +1,12 @@
 
 import unittest
 import os
-import tempfile
 import sys
 from datetime import datetime
 
 # Add parent directory to path to import indexer
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import indexer
 from indexer import stream_mbox_messages, generate_docs, clean_html, parse_labels, sanitize_header, extract_attachments
 
 class TestIndexer(unittest.TestCase):

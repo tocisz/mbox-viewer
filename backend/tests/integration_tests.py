@@ -219,8 +219,131 @@ def test_search_date_simple():
     data = resp.json()
     assert data["total"] >= 3
     
-    # Search for emails BEFORE 2024-01-01 (should find NONE)
+    # Search for emails BEFORE 2024-01-01 (should find the 2014 Chat log)
     resp = requests.get(f"{API_URL}/search", params={"end_date": "2024-01-01", "size": 10})
     assert resp.status_code == 200
     data = resp.json()
+    assert data["total"] >= 1
+    
+    # Search for emails BEFORE 2000-01-01 (should find NONE)
+    resp = requests.get(f"{API_URL}/search", params={"end_date": "2000-01-01", "size": 10})
+    assert resp.status_code == 200
+    data = resp.json()
     assert data["total"] == 0
+
+def test_chat_date_parsing():
+    # Search for Chat Log Test
+    resp = requests.get(f"{API_URL}/search", params={"q": "\"Chat Log Test\""})
+    items = resp.json()["items"]
+    assert len(items) > 0
+    item = items[0]
+    
+    # Should match the date in From line/X-Received (2014-07-10)
+    # The time might be UTC or local depending on parsing, but year/month/day should match
+    assert "2014" in item["date"]
+    assert "-07" in item["date"]
+    assert "-10" in item["date"]
+
+def test_crlf_sanitization():
+    # Search for email with newline in subject
+    # Note: Search query might need to be partial since we sanitized it
+    resp = requests.get(f"{API_URL}/search", params={"q": "Newline"})
+    items = resp.json()["items"]
+    # We expect one email
+    target_item = next((i for i in items if "Subject with Newline" in i["subject"]), None)
+    
+    # If sanitization worked, it should be "Subject with Newline" (collapsed spaces) 
+    # or "Subject with  Newline" depending on exact logic, but definitely NO \n or \r
+    assert target_item is not None
+    assert "\n" not in target_item["subject"]
+    assert "\r" not in target_item["subject"]
+    
+def test_mime_decoding():
+    from email.header import decode_header
+    
+    # The subject we put in sample.mbox:
+    encoded_subject = "=?iso-8859-2?Q?Zaza=F3=B3=E6_G=EA=9Cl=B1_Ja=BC=F1?="
+    
+    # Decode it dynamically to get the expected string
+    # decode_header returns list of (bytes, encoding)
+    decoded_parts = decode_header(encoded_subject)
+    expected_subject = ""
+    for part, encoding in decoded_parts:
+        if isinstance(part, bytes):
+            expected_subject += part.decode(encoding or "utf-8")
+        else:
+            expected_subject += part
+            
+    print(f"DEBUG: Expected subject: {expected_subject}")
+
+    resp = requests.get(f"{API_URL}/search", params={"size": 50})
+    items = resp.json()["items"]
+    
+    found = False
+    for item in items:
+        # Check for exact match
+        if item["subject"] == expected_subject:
+            found = True
+            break
+            
+    assert found, f"Could not find email with subject: {expected_subject}"
+
+def test_attachment_filename_sanitization():
+    resp = requests.get(f"{API_URL}/search", params={"q": "\"Attachment with Slash\""})
+    items = resp.json()["items"]
+    assert len(items) > 0
+    email_id = items[0]["id"]
+    
+    resp = requests.get(f"{API_URL}/email/{email_id}")
+    data = resp.json()
+    attachments = data["attachments"]
+    assert len(attachments) == 1
+    
+    # Filename should be sanitized (images/slash.png -> images_slash.png or similar)
+    if isinstance(attachments, list):
+        att = attachments[0]
+    else:
+        att = attachments
+        
+    assert "/" not in att["filename"]
+    assert "images_slash.png" in att["filename"]
+    
+def test_plain_text_body():
+    # Check "Test Email 1" again for explicit body check
+    resp = requests.get(f"{API_URL}/search", params={"q": "\"Test Email 1\""})
+    items = resp.json()["items"]
+    email_id = items[0]["id"]
+    
+    resp = requests.get(f"{API_URL}/email/{email_id}")
+    data = resp.json()
+    
+    # Verify body_text matches content
+    assert "This is a plain text email." in data["body_html"] or "This is a plain text email." in data.get("body_text", "")
+
+def test_malformed_date_parsing():
+    # 1. Short date: 28-09-12 -> 2012-09-28
+    resp = requests.get(f"{API_URL}/search", params={"q": "\"Malformed Date Short\""})
+    items = resp.json()["items"]
+    assert len(items) > 0
+    item = items[0]
+    # Check if year is 2012
+    assert "2012-09-28" in item["date"]
+    
+    # 2. Incomplete date: Wed, 14 May 2008 15 -> 2008-05-14
+    resp = requests.get(f"{API_URL}/search", params={"q": "\"Malformed Date Incomplete\""})
+    items = resp.json()["items"]
+    assert len(items) > 0
+    item = items[0]
+    # Check if year is 2008
+    assert "2008-05-14" in item["date"]
+
+def test_received_header_fallback():
+    # Search for "Fallback Date Received Test"
+    # It has "Received: ...; Fri, 21 Nov 2007 09:55:06 -0600"
+    resp = requests.get(f"{API_URL}/search", params={"q": "\"Fallback Date Received Test\""})
+    items = resp.json()["items"]
+    assert len(items) > 0
+    item = items[0]
+    
+    # Should resolve to 2007
+    assert "2007-11-21" in item["date"]

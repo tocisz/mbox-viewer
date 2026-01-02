@@ -48,3 +48,86 @@ Content-Transfer-Encoding: base64
 SGVsbG8gV29ybGQh
 
 --boundary123--
+
+From 12345@xxx Thu Jul 10 14:57:19 +0000 2014
+X-Gmail-Labels: Chat
+From: "sender@gmail.com" <sender@gmail.com>
+Subject: Chat Log Test
+Message-ID: <chat-log-id@gmail.com>
+X-Received: by 10.224.65.194; Thu, 10 Jul 2014 07:57:19 -0700 (PDT)
+
+Chat message body
+
+From sender@example.com Tue Dec 30 15:00:00 2025
+Message-ID: <crlf@example.com>
+Date: Tue, 30 Dec 2025 15:00:00 +0000
+From: Sender <sender@example.com>
+Subject: Subject with
+ Newline
+To: Recipient <recipient@example.com>
+X-Gmail-Labels: Inbox
+
+Body with CRLF header
+
+From sender@example.com Tue Dec 30 16:00:00 2025
+Message-ID: <mime@example.com>
+Date: Tue, 30 Dec 2025 16:00:00 +0000
+From: Sender <sender@example.com>
+Subject: =?iso-8859-2?Q?Zaza=F3=B3=E6_G=EA=9Cl=B1_Ja=BC=F1?=
+To: Recipient <recipient@example.com>
+X-Gmail-Labels: Inbox
+
+Body with Polish characters in subject
+
+From sender@example.com Tue Dec 30 17:00:00 2025
+Message-ID: <att_slash@example.com>
+Date: Tue, 30 Dec 2025 17:00:00 +0000
+From: Sender <sender@example.com>
+Subject: Attachment with Slash
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary_slash"
+X-Gmail-Labels: Inbox
+
+--boundary_slash
+Content-Type: text/plain; charset="utf-8"
+
+Content.
+
+--boundary_slash
+Content-Type: image/png; name="images/slash.png"
+Content-Disposition: attachment; filename="images/slash.png"
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNiAAAABgDNjd8qAAAAAElFTkSuQmCC
+
+--boundary_slash--
+
+From sender@example.com Tue Dec 30 18:00:00 2025
+Message-ID: <malformed_short@example.com>
+Date: 28-09-12
+From: Sender <sender@example.com>
+Subject: Malformed Date Short
+X-Gmail-Labels: Inbox
+
+Body for short date
+
+From sender@example.com Tue Dec 30 19:00:00 2025
+Message-ID: <malformed_incomplete@example.com>
+Date: Wed, 14 May 2008 15
+From: Sender <sender@example.com>
+Subject: Malformed Date Incomplete
+X-Gmail-Labels: Inbox
+
+Body for incomplete date
+
+From sender@example.com Tue Dec 30 20:00:00 2025
+Message-ID: <fallback_received@example.com>
+From: Sender <sender@example.com>
+Subject: Fallback Date Received Test
+To: Recipient <recipient@example.com>
+X-Gmail-Labels: Inbox
+Received: from mail.example.com (mail.example.com [10.0.0.1])
+        by mx.google.com with ESMTPS id 12345
+        for <recipient@example.com>; Fri, 21 Nov 2007 09:55:06 -0600
+
+Body for received fallback
