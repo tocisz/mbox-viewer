@@ -1,6 +1,6 @@
-use leptos::*;
-use gloo_net::http::Request;
 use crate::EmailDetailData;
+use gloo_net::http::Request;
+use leptos::*;
 
 #[component]
 pub fn EmailDetail(
@@ -10,22 +10,22 @@ pub fn EmailDetail(
 ) -> impl IntoView {
     let (email, set_email) = create_signal::<Option<EmailDetailData>>(None);
     let (loading, set_loading) = create_signal(false);
-    
+
     let id_clone = id.clone();
     create_effect(move |_| {
         let current_id = id_clone.clone();
         spawn_local(async move {
-             set_loading.set(true);
-             let url = format!("http://localhost:8001/email/{}", current_id);
-             match Request::get(&url).send().await {
-                 Ok(resp) => {
-                     if let Ok(data) = resp.json::<EmailDetailData>().await {
-                         set_email.set(Some(data));
-                     }
-                 },
-                 Err(e) => leptos::logging::error!("Failed to fetch email: {:?}", e),
-             }
-             set_loading.set(false);
+            set_loading.set(true);
+            let url = format!("http://localhost:8001/email/{}", current_id);
+            match Request::get(&url).send().await {
+                Ok(resp) => {
+                    if let Ok(data) = resp.json::<EmailDetailData>().await {
+                        set_email.set(Some(data));
+                    }
+                }
+                Err(e) => leptos::logging::error!("Failed to fetch email: {:?}", e),
+            }
+            set_loading.set(false);
         });
     });
 
@@ -42,12 +42,12 @@ pub fn EmailDetail(
                 if loading.get() {
                     return view! { <div class="p-8 text-center">"Loading message..."</div> }.into_view();
                 }
-                
+
                 match email.get() {
                     Some(e) => {
                         let sender_char = e.sender.chars().next().unwrap_or('?').to_uppercase().to_string();
                         let body_html = e.body_html.clone();
-                        
+
                         view! {
                             <>
                             <h1 class="text-2xl font-normal text-gray-900 mb-4 pr-10">{e.subject}</h1>
@@ -65,7 +65,7 @@ pub fn EmailDetail(
                                     {e.date}
                                 </div>
                             </div>
-                            
+
                             {if !e.labels.is_empty() {
                                 view! {
                                     <div class="flex flex-wrap gap-2 mb-6">
@@ -89,9 +89,9 @@ pub fn EmailDetail(
                             } else {
                                 view! {}.into_view()
                             }}
-                            
+
                             <div class="border-t pt-6 mb-8" inner_html=body_html />
-                            
+
                             {if !e.attachments.is_empty() {
                                 view! {
                                     <div class="border-t pt-6">
@@ -103,7 +103,7 @@ pub fn EmailDetail(
                                                 each=move || e.attachments.clone()
                                                 key=|att| att.path.clone()
                                                 children=move |att| {
-                                                    let size_kb = (att.size as f64 / 1024.0);
+                                                    let size_kb = att.size as f64 / 1024.0;
                                                     let size_str = format!("{:.1} KB", size_kb);
                                                     let download_url = format!("http://localhost:8001/attachment/{}", att.path);
                                                     view! {

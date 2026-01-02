@@ -69,17 +69,6 @@ pub fn App() -> impl IntoView {
         set_selected_email_id.set(None);
     };
 
-    let handle_search = move |query: String| {
-        set_search_query.set(query);
-        if !search_query.get_untracked().is_empty() {
-            // In original app, label is cleared on search.
-            // Logic: if searchInput is present, selectedLabel set to null.
-            // We can do set_selected_label("".to_string()) or handle accordingly.
-            // But existing logic was: if(searchInput) setSelectedLabel(null)
-            // We'll mimic that in the header component or here.
-        }
-    };
-
     view! {
         <div class="flex h-screen w-screen flex-col bg-gray-100 text-sm">
             <Header
