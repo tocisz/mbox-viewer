@@ -23,10 +23,11 @@ Ensure you have the following installed:
    pip install -r tests/requirements.txt
    ```
 
-3. **Frontend (React)**:
+3. **Frontend (Rust)**:
    ```bash
-   cd frontend
-   npm install
+   cd frontend-rust
+   cargo binstall trunk
+   # Trunk handles dependencies and build
    ```
 
 ---
