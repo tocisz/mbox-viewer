@@ -22,7 +22,7 @@ elasticsearch-*/
 
 # Data & Archives
 Takeout/
-attachments/
+attachments*
 *.tar.gz
 *.mbox
 !backend/tests/data/*.mbox

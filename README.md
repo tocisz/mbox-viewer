@@ -5,7 +5,7 @@ A local web application to view and search emails from a Gmail MBOX export (`Tak
 ## Prerequisites
 
 Ensure you have the following installed:
-- **Python 3.10+** (For indexing)
+- **Rust & Cargo** (For backend & indexing)
 - **Node.js 18+** & **npm** (For frontend)
 - **Rust & Cargo** (For backend)
 
@@ -49,7 +49,7 @@ This starts:
 
 ## 3. Index Your MBOX File
 
-Before you can search, you must index your MBOX data. The indexer is a Python script that reads the MBOX file and pushes data to the running Rust server.
+Before you can search, you must index your MBOX data. The indexer is now built into the Rust `email-server` binary.
 
 1. **Start the Email Server**:
    ```bash
@@ -60,10 +60,11 @@ Before you can search, you must index your MBOX data. The indexer is a Python sc
 
 2. **Run Indexer**:
    ```bash
-   cd backend
-   source .venv/bin/activate
+   cd email-server
    # Replace path with your MBOX file
-   python indexer.py --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox"
+   # Note: --attachments-dir is required to extract and serve attachments. 
+   # It should match the directory served by the email-server (default: "attachments")
+   cargo run --release -- index --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox" --es-host "http://localhost:8001" --attachments-dir "attachments"
    ```
 
 ---

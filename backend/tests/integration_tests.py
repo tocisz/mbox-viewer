@@ -88,11 +88,12 @@ def setup_environment():
     idx_env["TANTIVY_API_URL"] = API_URL
     idx_env["PYTHONPATH"] = str(BACKEND_DIR)
     
-    print(f"Running indexer with python: {sys.executable}")
+    print(f"Running email-server indexer...")
     cmd = [
-        sys.executable, 
-        str(BACKEND_DIR / "indexer.py"),
+        str(binary_path),
+        "index",
         "--mbox", str(SAMPLE_MBOX),
+        "--es-host", API_URL, 
         "--reindex",
         "--attachments-dir", str(TEST_ATTACHMENTS_DIR)
     ]

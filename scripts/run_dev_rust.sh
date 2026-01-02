@@ -18,7 +18,7 @@ trap "echo 'Stopping dev servers...'; kill 0" SIGINT
 
 echo "Starting Email Server (Rust) on http://localhost:8001..."
 # Run from email-server dir to ensure index is stored there and attachments path is correct
-(cd email-server && ./target/release/email-server) &
+(cd email-server && ./target/release/email-server serve --attachments-dir "../attachments") &
 
 # Give it a moment to bind port
 sleep 2
