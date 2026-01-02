@@ -19,7 +19,7 @@ TEST_ATTACHMENTS_DIR = ROOT_DIR / "tests" / "data" / "attachments"
 def setup_environment():
     """
     Sets up the test environment:
-    1. start email-server on test port
+    1. start backend on test port
     2. index data with attachments
     """
     # 0. Clean/Create attachments dir
@@ -37,7 +37,7 @@ def setup_environment():
     print(f"Indexing data directly...")
     idx_env = os.environ.copy()
     
-    binary_path = ROOT_DIR / "email-server" / "target" / "release" / "email-server"
+    binary_path = ROOT_DIR / "backend" / "target" / "release" / "backend"
     if not binary_path.exists():
         pytest.fail(f"Binary not found at {binary_path}")
 
@@ -58,7 +58,7 @@ def setup_environment():
     print("Indexing complete.")
 
     # Start Backend Server
-    print(f"\nStarting email-server on port {TEST_PORT}...")
+    print(f"\nStarting backend on port {TEST_PORT}...")
     
     env = os.environ.copy()
     env["ATTACHMENTS_DIR"] = str(TEST_ATTACHMENTS_DIR)

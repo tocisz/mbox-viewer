@@ -9,22 +9,22 @@ This document outlines the architecture, workflows, and conventions for the Gmai
 ## 1. Architecture Overview
 The project is a **Full Stack Rust** application.
 
-- **Frontend**: Rust (Leptos) (`/frontend-rust`).
+- **Frontend**: Rust (Leptos) (`/frontend`).
   - **Framework**: Leptos (CSR - Client Side Rendering).
   - **Build Tool**: `trunk`.
   - **Styling**: Tailwind CSS (via `npm` & `tailwindcss` CLI).
   - **Serving**: Compiled to WebAssembly (WASM) & JS, served by the Backend.
 
-- **Backend (Active)**: Rust (`/email-server`).
-  - Binary: `email-server`.
+- **Backend (Active)**: Rust (`/backend`).
+  - Binary: `backend`.
   - Roles: 
     - API Provider. 
     - Search Engine (Tantivy).
-    - Static File Server (`frontend-rust/dist` + `attachments`).
+    - Static File Server (`frontend/dist` + `attachments`).
   - Port: `8001` (Default).
   - Environment Variables: `PORT`, `ATTACHMENTS_DIR`.
 
-- **Indexer**: Rust (Inside `email-server`).
+- **Indexer**: Rust (Inside `backend`).
   - Role: Parses MBOX files and directly writes to the Tantivy index on the filesystem.
   - **Constraint**: Cannot run while the server is running (Single-writer lock).
 
@@ -45,17 +45,17 @@ The project is a **Full Stack Rust** application.
 This script will:
 1. Build the frontend using `trunk build --release`.
 2. Build the backend using `cargo build --release`.
-3. Start the `email-server` on port `8001`.
+3. Start the `backend` on port `8001`.
 
 ### modifying the Frontend
-- **Logic**: Edit Rust files in `frontend-rust/src/`.
+- **Logic**: Edit Rust files in `frontend/src/`.
 - **UI/CSS**: proper Leptos components + Tailwind classes.
 - **Build**: `trunk build` (or rely on the script).
 
 ### Making Backend Changes
-1. Modify Rust code in `email-server/src/main.rs` or `email-server/src/store.rs`.
+1. Modify Rust code in `backend/src/main.rs` or `backend/src/store.rs`.
 2. If changing the Index schema, you **must**:
-   - Update `email-server/src/store.rs` (Schema definition).
+   - Update `backend/src/store.rs` (Schema definition).
    - Re-index data to verify.
 
 ## 3. Testing Guidelines
@@ -64,7 +64,7 @@ This script will:
 We use Python `pytest` to verify the Rust backend API.
 - File: `tests/integration_tests.py`.
 - **Behavior**:
-  - Starts a **fresh** instance of `email-server` on Port **8002**.
+  - Starts a **fresh** instance of `backend` on Port **8002**.
   - Uses a temporary directory for the index.
   - Indexes `tests/data/sample.mbox`.
   - runs assertions against the API.
@@ -84,4 +84,4 @@ We use Python `pytest` to verify the Rust backend API.
 - **Ports**: 
   - `8001`: Main Application (Frontend + Backend).
   - `8002`: Integration Test Server.
-- **Frontend Serving**: The backend serves `index.html` as a fallback for unknown routes to support SPA routing (if enabled). ensure `frontend-rust/dist` exists.
+- **Frontend Serving**: The backend serves `index.html` as a fallback for unknown routes to support SPA routing (if enabled). ensure `frontend/dist` exists.

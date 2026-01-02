@@ -25,7 +25,7 @@ Ensure you have the following installed:
 
 3. **Frontend (Rust)**:
    ```bash
-   cd frontend-rust
+   cd frontend
    cargo binstall trunk
    # Trunk handles dependencies and build
    ```
@@ -48,17 +48,17 @@ This starts:
 
 ## 3. Index Your MBOX File
 
-Before you can search, you must index your MBOX data. The indexer is now built into the Rust `email-server` binary.
+Before you can search, you must index your MBOX data. The indexer is now built into the Rust `backend` binary.
 
 1. **Stop the Email Server** (if running):
    The indexer requires exclusive write access to the index.
 
 2. **Run Indexer**:
    ```bash
-   cd email-server
+   cd backend
    # Replace path with your MBOX file
    # Note: --attachments-dir is required to extract and serve attachments.
-   # It should match the directory served by the email-server (default: "attachments")
+   # It should match the directory served by the backend (default: "attachments")
    cargo run --release -- index --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox" --attachments-dir "../attachments"
    ```
 
@@ -70,8 +70,8 @@ Before you can search, you must index your MBOX data. The indexer is now built i
 ---
 
 ## Project Structure
-*   `email-server/`: Rust-based backend (API + File Serving + Search).
-*   `frontend-rust/`: Rust (Leptos) web user interface.
+*   `backend/`: Rust-based backend (API + File Serving + Search).
+*   `frontend/`: Rust (Leptos) web user interface.
 
 *   `tests/`: Integration tests and sample data.
 *   `scripts/`: Utility scripts.

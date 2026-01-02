@@ -7,7 +7,7 @@ mod server;
 mod store;
 
 #[derive(Parser)]
-#[command(name = "email-server")]
+#[command(name = "backend")]
 #[command(about = "Gmail MBOX Viewer Backend & Indexer")]
 struct Cli {
     #[command(subcommand)]

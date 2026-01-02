@@ -1,4 +1,4 @@
-use frontend_rust::App;
+use frontend::App;
 use leptos::*;
 
 pub fn main() {

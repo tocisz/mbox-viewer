@@ -2,9 +2,9 @@
 description: Run backend integration tests to verify system functionality
 ---
 
-1. Build the Rust email-server binary to ensure it's up to date.
+1. Build the Rust backend binary to ensure it's up to date.
    ```bash
-   cd email-server
+   cd backend
    cargo build --release
    ```
 

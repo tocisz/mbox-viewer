@@ -12,16 +12,16 @@ fi
 
 # Build Frontend
 echo "Building Frontend (Leptos)..."
-cd frontend-rust
+cd frontend
 trunk build --release
 cd ..
 
 # Build Backend
 echo "Building Backend..."
-cd email-server
+cd backend
 cargo build --release
 cd ..
 
 echo "Starting Email Server (Full Stack Rust) on http://localhost:8001..."
-# Run from email-server dir
-(cd email-server && ./target/release/email-server serve --attachments-dir "../attachments")
+# Run from backend dir
+(cd backend && ./target/release/backend serve --attachments-dir "../attachments")
