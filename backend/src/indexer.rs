@@ -21,8 +21,8 @@ pub async fn run_indexer(
 ) -> Result<()> {
     info!("Starting indexer for {}", mbox_path);
 
-    let index_path = "tantivy_index";
-    let index_store = EmailIndex::new(std::path::Path::new(index_path))?;
+    let index_path = std::env::var("INDEX_PATH").unwrap_or_else(|_| "tantivy_index".to_string());
+    let index_store = EmailIndex::new(std::path::Path::new(&index_path))?;
     let mut writer = index_store.writer()?;
 
     // 2. Reindex if requested

@@ -36,14 +36,14 @@ struct SearchParams {
 }
 
 pub async fn run_server(port: u16, attachments_dir: String) -> anyhow::Result<()> {
-    let index_path = "tantivy_index";
-    std::fs::create_dir_all(index_path)?;
+    let index_path = std::env::var("INDEX_PATH").unwrap_or_else(|_| "tantivy_index".to_string());
+    std::fs::create_dir_all(&index_path)?;
 
     // Attachments dir passed from main
 
     std::fs::create_dir_all(&attachments_dir)?;
 
-    let index_store = EmailIndex::new(std::path::Path::new(index_path))?;
+    let index_store = EmailIndex::new(std::path::Path::new(&index_path))?;
     let reader = index_store
         .index
         .reader_builder()
@@ -55,6 +55,10 @@ pub async fn run_server(port: u16, attachments_dir: String) -> anyhow::Result<()
         index_store,
     };
 
+    let frontend_dir =
+        std::env::var("FRONTEND_DIR").unwrap_or_else(|_| "../frontend/dist".to_string());
+    let frontend_index = format!("{}/index.html", frontend_dir);
+
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/search", get(search_emails_get))
@@ -62,14 +66,17 @@ pub async fn run_server(port: u16, attachments_dir: String) -> anyhow::Result<()
         .route("/email/:id", get(get_email_detail))
         .route("/doc/:id", get(get_document_raw))
         .nest_service("/attachment", ServeDir::new(attachments_dir))
-        .fallback_service(ServeDir::new("../frontend/dist").fallback(
-            tower_http::services::ServeFile::new("../frontend/dist/index.html"),
-        ))
+        .fallback_service(
+            ServeDir::new(&frontend_dir)
+                .fallback(tower_http::services::ServeFile::new(frontend_index)),
+        )
         .layer(CorsLayer::permissive())
         .layer(axum::extract::DefaultBodyLimit::max(50_000_000))
         .with_state(state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let addr_str = format!("{}:{}", host, port);
+    let addr: SocketAddr = addr_str.parse().expect("Invalid address format");
     info!("Email Server listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;

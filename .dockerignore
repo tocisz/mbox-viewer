@@ -1,0 +1,14 @@
+target/
+docs/
+.git/
+.gitignore
+.venv/
+.env
+.vscode/
+**/node_modules/
+**/dist/
+Takeout/
+tests/
+scripts/
+Dockerfile
+README.md

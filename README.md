@@ -5,8 +5,9 @@ A local web application to view and search emails from a Gmail MBOX export (`Tak
 ## Prerequisites
 
 Ensure you have the following installed:
-- **Rust & Cargo** (For backend, frontend & indexing)
-- **Trunk** (`cargo install trunk`) - For building the frontend
+- **Docker** (Recommended for easy run)
+- **Rust & Cargo** (For source build)
+- **Trunk** (`cargo install trunk`) - For building the frontend from source
 
 
 ---
@@ -46,7 +47,43 @@ This starts:
 
 ---
 
-## 3. Index Your MBOX File
+## 3. Docker (Easy Install)
+
+You can run the application using Docker without installing Rust or Python locally.
+
+### Build the Image
+```bash
+docker build -t mbox-viewer .
+```
+
+### Run with an MBOX file
+To automatically index and view a specific MBOX file (data persists in the `mbox-data` volume):
+
+```bash
+docker run --rm -p 8001:8001 \
+  --name mbox-viewer \
+  -v /path/to/your/mail.mbox:/data/mail.mbox \
+  -v mbox-data:/data \
+  mbox-viewer
+```
+
+### Run with existing Index
+If you already have indexed data:
+
+```bash
+docker run --rm -p 8001:8001 \
+  --name mbox-viewer \
+  -v mbox-data:/data \
+  mbox-viewer
+```
+
+The application will be available at `http://localhost:8001`.
+
+
+
+---
+
+## 4. Manual Indexing (Source Build)
 
 Before you can search, you must index your MBOX data. The indexer is now built into the Rust `backend` binary.
 
@@ -72,7 +109,5 @@ Before you can search, you must index your MBOX data. The indexer is now built i
 ## Project Structure
 *   `backend/`: Rust-based backend (API + File Serving + Search).
 *   `frontend/`: Rust (Leptos) web user interface.
-
 *   `tests/`: Integration tests and sample data.
 *   `scripts/`: Utility scripts.
-*   `Takeout/`: (Ignored) Gmail export data.
