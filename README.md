@@ -12,14 +12,17 @@ Ensure you have the following installed:
 
 ## 1. Environment Setup
 
-3. **Tests (Python)**:
+1. **Backend (Rust)**:
+   Ensure Rust is installed: [https://rustup.rs/](https://rustup.rs/)
+
+2. **Tests (Python)**:
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
-   pip install -r requirements.txt
+   pip install -r tests/requirements.txt
    ```
 
-4. **Frontend (React)**:
+3. **Frontend (React)**:
    ```bash
    cd frontend
    npm install
