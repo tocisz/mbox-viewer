@@ -4,6 +4,7 @@ use tracing_subscriber;
 mod common;
 mod indexer;
 mod server;
+mod store;
 
 #[derive(Parser)]
 #[command(name = "email-server")]
@@ -26,8 +27,6 @@ enum Commands {
     Index {
         #[arg(long)]
         mbox: String,
-        #[arg(long, default_value = "http://localhost:8001")]
-        es_host: String,
         #[arg(long)]
         reindex: bool,
         #[arg(long)]
@@ -45,11 +44,10 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Some(Commands::Index {
             mbox,
-            es_host,
             reindex,
             attachments_dir,
         }) => {
-            indexer::run_indexer(mbox, es_host, reindex, attachments_dir).await?;
+            indexer::run_indexer(mbox, reindex, attachments_dir).await?;
         }
         Some(Commands::Serve {
             port,

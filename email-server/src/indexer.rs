@@ -8,36 +8,28 @@ use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use tracing::{error, info};
+use tracing::info;
 
 use crate::common::EmailDoc;
+use crate::store::EmailIndex;
 use scraper::{Html, Node};
 
 pub async fn run_indexer(
     mbox_path: String,
-    es_host: String,
     reindex: bool,
     attachments_dir: Option<String>,
 ) -> Result<()> {
     info!("Starting indexer for {}", mbox_path);
 
-    // 1. Check server health
-    let client = reqwest::Client::new();
-    let health_url = format!("{}/health", es_host.trim_end_matches('/'));
-    match client.get(&health_url).send().await {
-        Ok(resp) => {
-            if !resp.status().is_success() {
-                anyhow::bail!("Server returned non-success status: {}", resp.status());
-            }
-        }
-        Err(e) => anyhow::bail!("Could not connect to server at {}: {}", health_url, e),
-    }
+    let index_path = "tantivy_index";
+    let index_store = EmailIndex::new(std::path::Path::new(index_path))?;
+    let mut writer = index_store.writer()?;
 
     // 2. Reindex if requested
     if reindex {
-        let delete_url = format!("{}/delete/emails", es_host.trim_end_matches('/'));
         info!("Clearing index...");
-        client.delete(&delete_url).send().await.ok();
+        index_store.clear(&mut writer)?;
+        writer.commit()?;
     }
 
     // 3. Process MBOX
@@ -74,7 +66,7 @@ pub async fn run_indexer(
                 current_email_lines.clear();
 
                 if batch.len() >= batch_size {
-                    send_batch(&client, &es_host, &batch).await?;
+                    index_store.add_emails(&mut writer, &batch)?;
                     batch.clear();
                     info!("Indexed {} documents...", count);
                 }
@@ -101,21 +93,12 @@ pub async fn run_indexer(
     }
 
     if !batch.is_empty() {
-        send_batch(&client, &es_host, &batch).await?;
+        index_store.add_emails(&mut writer, &batch)?;
     }
+
+    writer.commit()?;
 
     info!("Indexing complete. Total documents: {}", count);
-    Ok(())
-}
-
-async fn send_batch(client: &reqwest::Client, host: &str, batch: &[EmailDoc]) -> Result<()> {
-    let url = format!("{}/index", host.trim_end_matches('/'));
-    let resp = client.post(&url).json(batch).send().await?;
-
-    if !resp.status().is_success() {
-        let err_text = resp.text().await.unwrap_or_default();
-        error!("Batch index failed: {}", err_text);
-    }
     Ok(())
 }
 

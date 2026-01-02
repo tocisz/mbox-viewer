@@ -51,20 +51,21 @@ This starts:
 
 Before you can search, you must index your MBOX data. The indexer is now built into the Rust `email-server` binary.
 
-1. **Start the Email Server**:
-   ```bash
-   # In a separate terminal
-   cd email-server
-   cargo run --release
-   ```
+1. **Stop the Email Server** (if running):
+   The indexer requires exclusive write access to the index.
 
 2. **Run Indexer**:
    ```bash
    cd email-server
    # Replace path with your MBOX file
-   # Note: --attachments-dir is required to extract and serve attachments. 
+   # Note: --attachments-dir is required to extract and serve attachments.
    # It should match the directory served by the email-server (default: "attachments")
-   cargo run --release -- index --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox" --es-host "http://localhost:8001" --attachments-dir "attachments"
+   cargo run --release -- index --mbox "../Takeout/Mail/All mail Including Spam and Trash.mbox" --attachments-dir "attachments"
+   ```
+
+3. **Start the Email Server**:
+   ```bash
+   ./scripts/run_dev_rust.sh
    ```
 
 ---

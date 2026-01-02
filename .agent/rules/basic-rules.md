@@ -21,7 +21,8 @@ The project has migrated from a Python-only backend to a **Rust-based** architec
   - Environment Variables: `PORT`, `ATTACHMENTS_DIR`.
 
 - **Indexer**: Rust (Inside `email-server`).
-  - Role: Parses MBOX files and pushes documents to the Rust Backend's `/index` endpoint.
+  - Role: Parses MBOX files and directly writes to the Tantivy index on the filesystem.
+  - **Constraint**: Cannot run while the server is running (Single-writer lock).
 
 - **Legacy**: Python Server (`/backend/server.py`).
   - Status: **Deprecated**. Do not add new features here.
@@ -37,10 +38,9 @@ The project has migrated from a Python-only backend to a **Rust-based** architec
 ```
 
 ### Making Backend Changes
-1. Modify Rust code in `email-server/src/main.rs`.
+1. Modify Rust code in `email-server/src/main.rs` or `email-server/src/store.rs`.
 2. If changing the Index schema, you **must**:
-   - Update `email-server/src/main.rs` (Schema definition).
-   - Update `backend/indexer.py` (JSON document structure).
+   - Update `email-server/src/store.rs` (Schema definition).
    - Re-index data to verify.
 
 ## 3. Testing Guidelines

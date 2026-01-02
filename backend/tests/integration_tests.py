@@ -36,85 +36,64 @@ def setup_environment():
         shutil.rmtree(TEST_RUN_DIR)
     TEST_RUN_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(f"\nStarting email-server on port {TEST_PORT}...")
-    env = os.environ.copy()
-    env["ATTACHMENTS_DIR"] = str(TEST_ATTACHMENTS_DIR)
-    env["PORT"] = str(TEST_PORT)
-    env["RUST_LOG"] = "info" # Enable logging
-
+    # Index Data (DIRECTLY)
+    print(f"Indexing data directly...")
+    idx_env = os.environ.copy()
+    idx_env["PYTHONPATH"] = str(BACKEND_DIR)
+    
     binary_path = BACKEND_DIR / "../email-server/target/release/email-server"
     if not binary_path.exists():
         pytest.fail(f"Binary not found at {binary_path}")
 
-    # Start Backend Server
-    server_out = open("server.stdout.log", "w")
-    server_err = open("server.stderr.log", "w")
-    
-    proc = subprocess.Popen(
-        [str(binary_path)], 
-        cwd=str(TEST_RUN_DIR), 
-        env=env, 
-        stdout=server_out, 
-        stderr=server_err
-    )
-    
-    # Wait for startup
-    timeout = 10
-    start = time.time()
-    started = False
-    while time.time() - start < timeout:
-        try:
-            requests.get(f"{API_URL}/health")
-            started = True
-            break
-        except requests.ConnectionError:
-            time.sleep(0.5)
-            
-    if not started:
-        proc.kill()
-        server_out.close()
-        server_err.close()
-        print("Server failed to start. Logs:")
-        try:
-            with open("server.stdout.log", "r") as f: print("STDOUT:", f.read())
-            with open("server.stderr.log", "r") as f: print("STDERR:", f.read())
-        except: pass
-        pytest.fail("Backend server failed to start")
-        
-    # Index Data
-    print(f"Indexing data to {API_URL}...")
-    idx_env = os.environ.copy()
-    idx_env["SEARCH_SERVICE_TYPE"] = "tantivy"
-    idx_env["TANTIVY_API_URL"] = API_URL
-    idx_env["PYTHONPATH"] = str(BACKEND_DIR)
-    
-    print(f"Running email-server indexer...")
     cmd = [
         str(binary_path),
         "index",
         "--mbox", str(SAMPLE_MBOX),
-        "--es-host", API_URL, 
         "--reindex",
         "--attachments-dir", str(TEST_ATTACHMENTS_DIR)
     ]
     
-    result = subprocess.run(cmd, env=idx_env)
+    result = subprocess.run(cmd, env=idx_env, cwd=str(TEST_RUN_DIR))
     
     if result.returncode != 0:
         print(f"Indexing failed with return code {result.returncode}")
-        proc.terminate()
-        server_out.close()
-        server_err.close()
-        print("Server Logs:")
-        try:
-            with open("server.stdout.log", "r") as f: print("STDOUT:", f.read())
-            with open("server.stderr.log", "r") as f: print("STDERR:", f.read())
-        except: pass
         pytest.fail("Failed to index sample data")
         
     print("Indexing complete.")
-    time.sleep(2) # Allow searcher to reload
+
+    # Start Backend Server
+    print(f"\nStarting email-server on port {TEST_PORT}...")
+    
+    env = os.environ.copy()
+    env["ATTACHMENTS_DIR"] = str(TEST_ATTACHMENTS_DIR)
+    env["PORT"] = str(TEST_PORT)
+    env["RUST_LOG"] = "info" # Enable logging
+    
+    proc = subprocess.Popen(
+        [str(binary_path)], 
+        cwd=str(TEST_RUN_DIR), 
+        env=env
+    )
+
         
+    # Wait for server to be ready
+    print("Waiting for server to be ready...")
+    ready = False
+    for i in range(10): # Try for 5 seconds
+        try:
+            resp = requests.get(f"{API_URL}/health")
+            if resp.status_code == 200:
+                print("Server is ready!")
+                ready = True
+                break
+        except requests.exceptions.ConnectionError:
+            pass
+        time.sleep(0.5)
+        
+    if not ready:
+        proc.terminate()
+        pytest.fail("Server failed to start within 5 seconds")
+
     yield
     
     # Cleanup
@@ -124,8 +103,7 @@ def setup_environment():
         proc.wait(timeout=5)
     except subprocess.TimeoutExpired:
         proc.kill()
-    server_out.close()
-    server_err.close()
+
     
     if TEST_ATTACHMENTS_DIR.exists():
         shutil.rmtree(TEST_ATTACHMENTS_DIR)

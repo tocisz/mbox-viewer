@@ -2,33 +2,27 @@ use axum::{
     extract::{Path, Query as AxumQuery, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{delete, get, post},
+    routing::get,
     Json, Router,
 };
-use chrono::{NaiveDate, NaiveDateTime, Utc};
+use chrono::{NaiveDate, Utc};
 use serde::Deserialize;
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+
 use tantivy::collector::{Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, BooleanQuery, Occur, QueryParser, RangeQuery, TermQuery};
-use tantivy::schema::{
-    Facet, FacetOptions, IndexRecordOption, Schema, FAST, INDEXED, STORED, TEXT,
-};
-use tantivy::{
-    doc, DateTime, Document, Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument, Term,
-};
+use tantivy::schema::{Document, Facet, IndexRecordOption};
+use tantivy::{DateTime, IndexReader, ReloadPolicy, TantivyDocument, Term};
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
-use tracing::{error, info};
+use tracing::info;
 
-use crate::common::EmailDoc;
+use crate::store::EmailIndex;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub index: Index,
     pub reader: IndexReader,
-    pub writer: Arc<RwLock<IndexWriter>>,
-    pub schema: Schema,
+    pub index_store: EmailIndex,
 }
 
 #[derive(Deserialize)]
@@ -46,48 +40,27 @@ pub async fn run_server(port: u16, attachments_dir: String) -> anyhow::Result<()
     std::fs::create_dir_all(index_path)?;
 
     // Attachments dir passed from main
+
     std::fs::create_dir_all(&attachments_dir)?;
 
-    let mut schema_builder = Schema::builder();
-    schema_builder.add_text_field("id", STORED | TEXT | FAST);
-    schema_builder.add_text_field("subject", TEXT | STORED);
-    schema_builder.add_text_field("from", TEXT | STORED);
-    schema_builder.add_text_field("to", TEXT | STORED);
-    schema_builder.add_date_field("date", STORED | INDEXED | FAST);
-    schema_builder.add_facet_field("labels", FacetOptions::default().set_stored());
-    schema_builder.add_text_field("body_text", TEXT | STORED);
-    schema_builder.add_text_field("body_html", STORED);
-    schema_builder.add_bool_field("has_attachment", STORED | INDEXED);
-    schema_builder.add_json_field("attachments", STORED);
-
-    let schema = schema_builder.build();
-    let index = Index::open_or_create(
-        tantivy::directory::MmapDirectory::open(index_path)?,
-        schema.clone(),
-    )?;
-
-    let writer = index.writer(50_000_000)?; // 50MB heap
-    let reader = index
+    let index_store = EmailIndex::new(std::path::Path::new(index_path))?;
+    let reader = index_store
+        .index
         .reader_builder()
         .reload_policy(ReloadPolicy::OnCommitWithDelay)
         .try_into()?;
 
     let state = AppState {
-        index,
         reader,
-        writer: Arc::new(RwLock::new(writer)),
-        schema,
+        index_store,
     };
 
     let app = Router::new()
         .route("/health", get(health_check))
-        .route("/index", post(index_documents))
         .route("/search", get(search_emails_get))
         .route("/labels", get(get_labels))
         .route("/email/:id", get(get_email_detail))
         .route("/doc/:id", get(get_document_raw))
-        .route("/create/:name", post(create_index_handler))
-        .route("/delete/:name", delete(delete_index))
         .nest_service("/attachment", ServeDir::new(attachments_dir))
         .layer(CorsLayer::permissive())
         .layer(axum::extract::DefaultBodyLimit::max(50_000_000))
@@ -105,101 +78,6 @@ async fn health_check() -> impl IntoResponse {
     (StatusCode::OK, Json(serde_json::json!({"status": "ok"})))
 }
 
-async fn create_index_handler(Path(name): Path<String>) -> impl IntoResponse {
-    info!("Creating index: {}", name);
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({"status": "created", "index": name})),
-    )
-}
-
-async fn delete_index(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> impl IntoResponse {
-    info!("Deleting/Clearing index: {}", name);
-    let mut writer = state.writer.write().unwrap();
-    writer.delete_all_documents().ok();
-    match writer.commit() {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({"status": "deleted", "index": name})),
-        ),
-        Err(e) => {
-            error!("Failed to clear index: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-        }
-    }
-}
-
-async fn index_documents(
-    State(state): State<AppState>,
-    Json(docs): Json<Vec<EmailDoc>>,
-) -> impl IntoResponse {
-    info!("Received {} documents for indexing", docs.len());
-    let mut writer = state.writer.write().unwrap();
-    let schema = &state.schema;
-
-    let id_field = schema.get_field("id").unwrap();
-    let subject_field = schema.get_field("subject").unwrap();
-    let from_field = schema.get_field("from").unwrap();
-    let to_field = schema.get_field("to").unwrap();
-    let date_field = schema.get_field("date").unwrap();
-    let labels_field = schema.get_field("labels").unwrap();
-    let body_text_field = schema.get_field("body_text").unwrap();
-    let body_html_field = schema.get_field("body_html").unwrap();
-    let has_attachment_field = schema.get_field("has_attachment").unwrap();
-    let attachments_field = schema.get_field("attachments").unwrap();
-
-    for doc_data in docs {
-        let date_parsed = chrono::DateTime::parse_from_rfc3339(&doc_data.date)
-            .map(|dt| dt.with_timezone(&Utc))
-            .or_else(|_| {
-                NaiveDateTime::parse_from_str(&doc_data.date, "%Y-%m-%d %H:%M:%S")
-                    .map(|ndt| ndt.and_utc())
-            })
-            .unwrap_or_else(|_| Utc::now());
-
-        let date = DateTime::from_timestamp_secs(date_parsed.timestamp());
-
-        let mut tantivy_doc = doc!(
-            id_field => doc_data.id,
-            subject_field => doc_data.subject,
-            from_field => doc_data.from,
-            to_field => doc_data.to,
-            date_field => date,
-            body_text_field => doc_data.body_text,
-            body_html_field => doc_data.body_html,
-            has_attachment_field => doc_data.has_attachment,
-            attachments_field => doc_data.attachments,
-        );
-
-        for label in doc_data.labels {
-            let facet = Facet::from(&format!("/{}", label));
-            tantivy_doc.add_facet(labels_field, facet);
-        }
-
-        writer.add_document(tantivy_doc).ok();
-    }
-
-    match writer.commit() {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({"status": "indexed"})),
-        ),
-        Err(e) => {
-            error!("Commit failed: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-        }
-    }
-}
-
 // Helper to extract string from Json Value (could be array or string)
 fn extract_string(val: &serde_json::Value) -> String {
     if val.is_array() {
@@ -214,7 +92,7 @@ async fn search_emails_get(
     AxumQuery(params): AxumQuery<SearchParams>,
 ) -> impl IntoResponse {
     let searcher = state.reader.searcher();
-    let schema = &state.schema;
+    let schema = &state.index_store.schema;
 
     let page = params.page.unwrap_or(1);
     let size = params.size.unwrap_or(20);
@@ -233,7 +111,7 @@ async fn search_emails_get(
     if let Some(q) = params.q {
         if !q.is_empty() {
             let query_parser = QueryParser::for_index(
-                &state.index,
+                &state.index_store.index,
                 vec![subject_field, from_field, body_text_field, to_field],
             );
             match query_parser.parse_query(&q) {
@@ -306,7 +184,11 @@ async fn search_emails_get(
             .map(|dt| DateTime::from_timestamp_secs(dt.timestamp()))
             .unwrap_or(DateTime::from_timestamp_secs(2147483647));
 
-        let field_name = state.schema.get_field_name(date_field).to_string();
+        let field_name = state
+            .index_store
+            .schema
+            .get_field_name(date_field)
+            .to_string();
         let range_query = RangeQuery::new_date(field_name, start..end);
         filter_queries.push((Occur::Must, Box::new(range_query)));
     }
@@ -322,7 +204,7 @@ async fn search_emails_get(
     let mut hits = Vec::new();
     for (_val, doc_address) in top_docs {
         let retrieved_doc: TantivyDocument = searcher.doc(doc_address).unwrap();
-        let doc_json = retrieved_doc.to_json(&state.schema);
+        let doc_json = retrieved_doc.to_json(&state.index_store.schema);
         let doc_obj: serde_json::Value = serde_json::from_str(&doc_json).unwrap();
 
         let labels: Vec<String> = doc_obj["labels"]
@@ -361,8 +243,9 @@ async fn search_emails_get(
 
 async fn get_labels(State(state): State<AppState>) -> impl IntoResponse {
     let searcher = state.reader.searcher();
-    let labels_field = state.schema.get_field("labels").unwrap();
-    let mut facet_collector = FacetCollector::for_field(state.schema.get_field_name(labels_field));
+    let labels_field = state.index_store.schema.get_field("labels").unwrap();
+    let mut facet_collector =
+        FacetCollector::for_field(state.index_store.schema.get_field_name(labels_field));
     facet_collector.add_facet("/");
     let facet_counts = searcher.search(&AllQuery, &facet_collector).unwrap();
     let mut labels = Vec::new();
@@ -377,7 +260,7 @@ async fn get_email_detail(
     Path(doc_id): Path<String>,
 ) -> impl IntoResponse {
     let searcher = state.reader.searcher();
-    let id_field = state.schema.get_field("id").unwrap();
+    let id_field = state.index_store.schema.get_field("id").unwrap();
     let term = Term::from_field_text(id_field, &doc_id);
     let query = TermQuery::new(term, IndexRecordOption::Basic);
 
@@ -385,7 +268,7 @@ async fn get_email_detail(
 
     if let Some((_score, doc_address)) = top_docs.first() {
         let retrieved_doc: TantivyDocument = searcher.doc(*doc_address).unwrap();
-        let doc_json = retrieved_doc.to_json(&state.schema);
+        let doc_json = retrieved_doc.to_json(&state.index_store.schema);
         let doc_obj: serde_json::Value = serde_json::from_str(&doc_json).unwrap();
 
         let labels: Vec<String> = doc_obj["labels"]
