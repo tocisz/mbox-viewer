@@ -25,6 +25,10 @@ jobs:
       - name: Install musl-tools
         run: sudo apt-get install -y musl-tools
 
+      - name: Install npm dependencies
+        working-directory: frontend
+        run: npm install
+
       - name: Build Frontend
         working-directory: frontend
         run: trunk build --release
