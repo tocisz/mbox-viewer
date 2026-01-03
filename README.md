@@ -1,5 +1,8 @@
 # Gmail MBOX Viewer
 
+[![Backend Check](https://github.com/tocisz/mbox-viewer/actions/workflows/backend-check.yml/badge.svg)](https://github.com/tocisz/mbox-viewer/actions/workflows/backend-check.yml)
+[![Frontend Check](https://github.com/tocisz/mbox-viewer/actions/workflows/frontend-check.yml/badge.svg)](https://github.com/tocisz/mbox-viewer/actions/workflows/frontend-check.yml)
+
 A local web application to view and search emails from a Gmail MBOX export (`Takeout/Mail`).
 
 ## Prerequisites
@@ -163,3 +166,31 @@ To create a fully static binary (no external usage of libc) that runs on any Lin
 *   `frontend/`: Rust (Leptos) web user interface.
 *   `tests/`: Integration tests and sample data.
 *   `scripts/`: Utility scripts.
+
+---
+
+## 6. Release & Deployment
+
+### Automated Releases
+This repository uses GitHub Actions to automate releases.
+
+- **CI Checks**: triggered on every push and pull request.
+- **Releases**: triggered when a tag starting with `v` is pushed (e.g., `v1.0.0`).
+
+### Setup Webhooks & Secrets
+To enable the DockerHub build, you must configure the following **Repository Secrets** on GitHub:
+
+1.  `DOCKER_USERNAME`: Your DockerHub username.
+2.  `DOCKER_PASSWORD`: Your DockerHub password or Access Token.
+
+### How to Release
+1.  Ensure all changes are merged to `main`.
+2.  Create and push a tag:
+    ```bash
+    git tag v1.0.0
+    git push origin v1.0.0
+    ```
+3.  The workflow will:
+    - Build and test both Frontend and Backend.
+    - Build a static Linux binary (`mbox-viewer-linux-amd64`) and attach it to the Release.
+    - Build and push a Docker image to DockerHub (`<user>/mbox-viewer:latest` and `<user>/mbox-viewer:v1.0.0`).

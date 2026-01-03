@@ -1,0 +1,43 @@
+name: Frontend Check
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'Cargo.*'
+      - '.github/workflows/frontend-check.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    # Cache dependencies
+    - uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin
+          ~/.cargo/registry
+          ~/.cargo/git
+          frontend/target
+        key: ${{ runner.os }}-cargo-frontend-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install Trunk
+      uses: jetli/trunk-action@v0.4.0
+      with:
+        version: 'latest'
+
+    - name: Build
+      run: trunk build --release
