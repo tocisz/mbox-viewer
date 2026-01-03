@@ -2,6 +2,7 @@
 
 [![Backend Check](https://github.com/tocisz/mbox-viewer/actions/workflows/backend-check.yml/badge.svg)](https://github.com/tocisz/mbox-viewer/actions/workflows/backend-check.yml)
 [![Frontend Check](https://github.com/tocisz/mbox-viewer/actions/workflows/frontend-check.yml/badge.svg)](https://github.com/tocisz/mbox-viewer/actions/workflows/frontend-check.yml)
+[![Integration Tests](https://github.com/tocisz/mbox-viewer/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/tocisz/mbox-viewer/actions/workflows/integration-tests.yml)
 
 A local web application to view and search emails from a Gmail MBOX export (`Takeout/Mail`).
 

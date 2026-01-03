@@ -1,0 +1,51 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'tests/**'
+      - 'Cargo.*'
+      - '.github/workflows/integration-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    # Cache Rust dependencies
+    - uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin
+          ~/.cargo/registry
+          ~/.cargo/git
+          backend/target
+        key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.txt
+
+    - name: Build Backend
+      working-directory: backend
+      run: cargo build --release
+
+    - name: Run Integration Tests
+      run: |
+        # Tests assume backend binary is at backend/target/release/backend
+        # integration_tests.py handles spawning the process
+        pytest tests/integration_tests.py
