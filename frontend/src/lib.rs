@@ -1,10 +1,15 @@
 use leptos::*;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::JsCast;
 
 mod components;
 use components::email_detail::EmailDetail;
 use components::email_list::EmailList;
 use components::sidebar::Sidebar;
+
+use components::label_selector::LabelSelector;
+use components::shortcut_handler::{ShortcutAction, ShortcutHandler};
+use components::shortcut_help::ShortcutHelp;
 
 // Models
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,6 +59,11 @@ pub fn App() -> impl IntoView {
     let (start_date, set_start_date) = create_signal("".to_string());
     let (end_date, set_end_date) = create_signal("".to_string());
 
+    // Shortcut State
+    let (is_help_open, set_is_help_open) = create_signal(false);
+    let (is_label_selector_open, set_is_label_selector_open) = create_signal(false);
+    let (last_shortcut, set_last_shortcut) = create_signal::<Option<ShortcutAction>>(None);
+
     // Callbacks
     let handle_select_label = move |label: String| {
         set_selected_label.set(label);
@@ -69,8 +79,54 @@ pub fn App() -> impl IntoView {
         set_selected_email_id.set(None);
     };
 
+    // Shortcut Handler logic
+    let on_shortcut = move |action: ShortcutAction| {
+        // Handle Global Actions immediately
+        match action {
+            ShortcutAction::Help => set_is_help_open.update(|v| *v = !*v),
+            ShortcutAction::CloseHelp => set_is_help_open.set(false),
+            ShortcutAction::Search => {
+                // Focus search logic is tricky without a ref,
+                // but we can pass this down to Header or handle via native DOM if desperate.
+                // For now, let's update a signal maybe? Or try to select the input.
+                if let Some(doc) = document().dyn_into::<web_sys::Document>().ok() {
+                    if let Some(el) = doc.get_element_by_id("search-input") {
+                        let _ = el.dyn_into::<web_sys::HtmlElement>().map(|h| h.focus());
+                    }
+                }
+            }
+
+            ShortcutAction::BackToList => {
+                set_selected_email_id.set(None);
+            }
+
+            // Navigation
+            ShortcutAction::GoToInbox => handle_select_label("Inbox".to_string()),
+            ShortcutAction::GoToSent => handle_select_label("Sent".to_string()),
+            ShortcutAction::GoToDrafts => handle_select_label("Drafts".to_string()),
+            ShortcutAction::GoToAll => handle_select_label("ALL".to_string()),
+            ShortcutAction::GoToStarred => handle_select_label("Starred".to_string()),
+            ShortcutAction::GoToTrash => handle_select_label("Trash".to_string()),
+            ShortcutAction::GoToImportant => handle_select_label("Important".to_string()),
+            ShortcutAction::GoToLabel => set_is_label_selector_open.set(true),
+
+            // Pass others to EmailList (j, k, selection etc) via signal
+            _ => {
+                set_last_shortcut.set(Some(action));
+            }
+        }
+    };
+
     view! {
         <div class="flex h-screen w-screen flex-col bg-gray-100 text-sm">
+            <ShortcutHandler on_action=on_shortcut />
+            <ShortcutHelp is_open=is_help_open on_close=move |_| set_is_help_open.set(false) />
+            <LabelSelector
+                is_open=is_label_selector_open
+                on_close=move |_| set_is_label_selector_open.set(false)
+                on_select=handle_select_label
+            />
+
             <Header
                 search_query=search_query
                 set_search_query=set_search_query
@@ -100,6 +156,7 @@ pub fn App() -> impl IntoView {
                             end_date=end_date
                             selected_email_id=selected_email_id
                             on_select_email=handle_select_email
+                            shortcut_signal=last_shortcut // Pass the signal
                         />
                      </div>
 
@@ -164,6 +221,7 @@ fn Header(
                 <form on:submit=on_submit class="flex-1 max-w-xl">
                     <div class="relative">
                         <input
+                            id="search-input"
                             type="text"
                             class="w-full bg-gray-100 border-none rounded-lg py-2.5 px-4 focus:bg-white focus:shadow shadow-inner transition-all outline-none"
                             placeholder="Search mail"

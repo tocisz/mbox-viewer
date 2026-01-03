@@ -14,7 +14,7 @@ serde_json = "1.0"
 gloo-net = "0.5"
 wasm-bindgen = "0.2"
 js-sys = "0.3"
-web-sys = { version = "0.3", features = ["HtmlElement", "Node", "Window", "Document", "Element", "Event", "MouseEvent", "InputEvent", "FileList", "File", "Url", "IntersectionObserver", "IntersectionObserverEntry", "IntersectionObserverInit"] }
+web-sys = { version = "0.3", features = ["HtmlElement", "Node", "Window", "Document", "Element", "Event", "MouseEvent", "InputEvent", "FileList", "File", "Url", "IntersectionObserver", "IntersectionObserverEntry", "IntersectionObserverInit", "ScrollIntoViewOptions", "ScrollLogicalPosition", "ScrollBehavior"] }
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 [profile.release]
