@@ -140,15 +140,12 @@ async fn search_emails_get(
                 &state.index_store.index,
                 vec![subject_field, from_field, body_text_field, to_field],
             );
-            match query_parser.parse_query(&q) {
-                Ok(query) => filter_queries.push((Occur::Must, query)),
-                Err(_) => {} // Ignore invalid queries
+            if let Ok(query) = query_parser.parse_query(&q) {
+                filter_queries.push((Occur::Must, query));
             }
         }
-    } else {
-        if params.label.is_none() && params.start_date.is_none() && params.end_date.is_none() {
-            filter_queries.push((Occur::Must, Box::new(AllQuery)));
-        }
+    } else if params.label.is_none() && params.start_date.is_none() && params.end_date.is_none() {
+        filter_queries.push((Occur::Must, Box::new(AllQuery)));
     }
 
     // Label

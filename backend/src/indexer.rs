@@ -258,8 +258,7 @@ fn traverse_node(node: ego_tree::NodeRef<scraper::Node>, output: &mut String) {
 }
 
 fn sanitize_header(val: &str) -> String {
-    val.replace('\r', " ")
-        .replace('\n', " ")
+    val.replace(['\r', '\n'], " ")
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
@@ -351,7 +350,7 @@ fn extract_parts(
                         .or_else(|| part.ctype.params.get("name").cloned())
                         .unwrap_or_else(|| "attachment".to_string());
 
-                    let safe_filename = filename.replace('/', "_").replace('\\', "_");
+                    let safe_filename = filename.replace(['/', '\\'], "_");
 
                     let safe_msg_id = msg_id.replace('/', "_");
                     let msg_dir = dir.join(&safe_msg_id);
