@@ -106,6 +106,58 @@ Before you can search, you must index your MBOX data. The indexer is now built i
 
 ---
 
+## 5. Single Binary Deployment
+
+You can build a single executable that contains both the backend and the frontend assets. This is useful for distribution.
+
+### 1. Build Frontend
+First, build the frontend to generate the artifacts in `frontend/dist`:
+
+```bash
+cd frontend
+trunk build --release
+cd ..
+```
+
+### 2. Build Backend with Embedded Assets
+Enable the `embed_frontend` feature:
+
+```bash
+cd backend
+cargo build --release --features embed_frontend
+```
+
+The resulting binary `target/release/backend` will serve the frontend from memory.
+
+### 3. Static Linking (Optional)
+To create a fully static binary (no external usage of libc) that runs on any Linux distribution (like Alpine):
+
+1. **Prerequisites**:
+   You **MUST** install `musl-tools` (or `musl-gcc`) because some dependencies (like `ring`) require a C compiler that supports musl.
+   ```bash
+   sudo apt-get install musl-tools
+   ```
+
+2. Install the musl target:
+   ```bash
+   rustup target add x86_64-unknown-linux-musl
+   ```
+
+3. Build with the target:
+   ```bash
+   cd backend
+   cargo build --release --target x86_64-unknown-linux-musl --features embed_frontend
+   ```
+
+   The resulting binary will be in `target/x86_64-unknown-linux-musl/release/backend`.
+   Verify it with:
+   ```bash
+   ldd target/x86_64-unknown-linux-musl/release/backend
+   # Output should encompass: "not a dynamic executable"
+   ```
+
+---
+
 ## Project Structure
 *   `backend/`: Rust-based backend (API + File Serving + Search).
 *   `frontend/`: Rust (Leptos) web user interface.

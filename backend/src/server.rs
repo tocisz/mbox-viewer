@@ -19,6 +19,14 @@ use tracing::info;
 
 use crate::store::EmailIndex;
 
+#[cfg(feature = "embed_frontend")]
+use rust_embed::RustEmbed;
+
+#[cfg(feature = "embed_frontend")]
+#[derive(RustEmbed)]
+#[folder = "../frontend/dist"]
+struct Assets;
+
 #[derive(Clone)]
 pub struct AppState {
     pub reader: IndexReader,
@@ -55,21 +63,29 @@ pub async fn run_server(port: u16, attachments_dir: String) -> anyhow::Result<()
         index_store,
     };
 
-    let frontend_dir =
-        std::env::var("FRONTEND_DIR").unwrap_or_else(|_| "../frontend/dist".to_string());
-    let frontend_index = format!("{}/index.html", frontend_dir);
-
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/search", get(search_emails_get))
         .route("/labels", get(get_labels))
         .route("/email/:id", get(get_email_detail))
         .route("/doc/:id", get(get_document_raw))
-        .nest_service("/attachment", ServeDir::new(attachments_dir))
-        .fallback_service(
+        .nest_service("/attachment", ServeDir::new(attachments_dir));
+
+    #[cfg(feature = "embed_frontend")]
+    let app = app.fallback(embedded_static_handler);
+
+    #[cfg(not(feature = "embed_frontend"))]
+    let app = {
+        let frontend_dir =
+            std::env::var("FRONTEND_DIR").unwrap_or_else(|_| "../frontend/dist".to_string());
+        let frontend_index = format!("{}/index.html", frontend_dir);
+        app.fallback_service(
             ServeDir::new(&frontend_dir)
                 .fallback(tower_http::services::ServeFile::new(frontend_index)),
         )
+    };
+
+    let app = app
         .layer(CorsLayer::permissive())
         .layer(axum::extract::DefaultBodyLimit::max(50_000_000))
         .with_state(state);
@@ -333,4 +349,33 @@ async fn get_document_raw(
     Path(doc_id): Path<String>,
 ) -> impl IntoResponse {
     get_email_detail(State(state), Path(doc_id)).await
+}
+
+#[cfg(feature = "embed_frontend")]
+async fn embedded_static_handler(uri: axum::http::Uri) -> impl IntoResponse {
+    let path = uri.path().trim_start_matches('/').to_string();
+    let path = if path.is_empty() { "index.html" } else { &path };
+
+    match Assets::get(path) {
+        Some(content) => {
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            (
+                [(axum::http::header::CONTENT_TYPE, mime.as_ref())],
+                content.data.into_owned(),
+            )
+                .into_response()
+        }
+        None => {
+            // SPA fallback
+            if let Some(index) = Assets::get("index.html") {
+                (
+                    [(axum::http::header::CONTENT_TYPE, "text/html")],
+                    index.data.into_owned(),
+                )
+                    .into_response()
+            } else {
+                (StatusCode::NOT_FOUND, "404 Not Found").into_response()
+            }
+        }
+    }
 }
