@@ -269,6 +269,11 @@ fn try_parse_date(date_str: &str) -> Option<DateTime<Utc>> {
         return None;
     }
 
+    // 0. Try generic RFC 3339 (ISO 8601)
+    if let Ok(dt) = DateTime::parse_from_rfc3339(date_str) {
+        return Some(dt.with_timezone(&Utc));
+    }
+
     // 1. Try generic RFC 2822
     if let Ok(dt) = DateTime::parse_from_rfc2822(date_str) {
         return Some(dt.with_timezone(&Utc));
