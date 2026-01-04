@@ -24,7 +24,7 @@ use rust_embed::RustEmbed;
 
 #[cfg(feature = "embed_frontend")]
 #[derive(RustEmbed)]
-#[folder = "../frontend/dist"]
+#[folder = "frontend_dist"]
 struct Assets;
 
 #[derive(Clone)]

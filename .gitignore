@@ -10,6 +10,7 @@ __pycache__/
 # Node.js
 node_modules/
 dist/
+backend/frontend_dist/
 build/
 frontend/style/output.css
 npm-debug.log*

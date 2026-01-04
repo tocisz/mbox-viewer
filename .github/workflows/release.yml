@@ -29,7 +29,7 @@ jobs:
             archive_name: mbox-viewer-linux-arm64.zip
             binary_name: mbox-viewer
           # MacOS Intel
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             use_cross: false
             archive_name: mbox-viewer-darwin-amd64.zip
@@ -87,6 +87,9 @@ jobs:
       - name: Build Backend
         working-directory: backend
         run: |
+          # Copy frontend assets to backend crate directory for RustEmbed
+          cp -r ../frontend/dist frontend_dist
+          
           if [ "${{ matrix.use_cross }}" = "true" ]; then
             cross build --release --target ${{ matrix.target }} --features embed_frontend
           else
