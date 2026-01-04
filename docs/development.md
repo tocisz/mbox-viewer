@@ -68,4 +68,31 @@ We use Python `pytest` for integration testing.
 source .venv/bin/activate
 pytest tests/integration_tests.py
 ```
-Or use the helper workflow if available.
+
+## CI Checks
+The following checks run automatically on GitHub for every commit. You should run them locally before pushing:
+
+### Backend
+```bash
+cd backend
+cargo fmt -- --check
+cargo clippy -- -D warnings
+cargo test
+```
+
+### Frontend
+```bash
+cd frontend
+trunk build --release
+```
+
+### Integration Tests
+Ensure the backend is built first:
+```bash
+cd backend
+cargo build --release
+cd ..
+source .venv/bin/activate
+pytest tests/integration_tests.py
+```
+
