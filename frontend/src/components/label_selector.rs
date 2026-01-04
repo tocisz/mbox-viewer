@@ -15,7 +15,7 @@ pub fn LabelSelector(
     // Fetch labels on mount
     create_effect(move |_| {
         spawn_local(async move {
-            let url = "http://localhost:8001/labels";
+            let url = "/labels";
             match Request::get(url).send().await {
                 Ok(resp) => {
                     if let Ok(data) = resp.json::<Vec<String>>().await {

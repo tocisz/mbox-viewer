@@ -1,5 +1,5 @@
-use leptos::*;
 use gloo_net::http::Request;
+use leptos::*;
 
 #[component]
 pub fn Sidebar(
@@ -10,19 +10,27 @@ pub fn Sidebar(
 
     create_effect(move |_| {
         spawn_local(async move {
-            let url = "http://localhost:8001/labels";
+            let url = "/labels";
             match Request::get(url).send().await {
                 Ok(resp) => {
                     if let Ok(data) = resp.json::<Vec<String>>().await {
                         set_labels.set(data);
                     }
-                },
+                }
                 Err(e) => leptos::logging::error!("Failed to fetch labels: {:?}", e),
             }
         });
     });
 
-    let standard = vec!["Inbox", "Sent", "Trash", "Spam", "Drafts", "Important", "Starred"];
+    let standard = vec![
+        "Inbox",
+        "Sent",
+        "Trash",
+        "Spam",
+        "Drafts",
+        "Important",
+        "Starred",
+    ];
 
     view! {
         <div class="w-64 bg-white border-r h-full flex flex-col overflow-y-auto">
@@ -41,11 +49,11 @@ pub fn Sidebar(
                 >
                     "ALL"
                 </button>
-                
+
                 {move || {
                     let current_labels = labels.get();
                     // Need to own the strings for local filtering
-                    
+
                     let mut sys_labels = Vec::new();
                     let mut others = Vec::new();
 
@@ -57,13 +65,13 @@ pub fn Sidebar(
                         }
                     }
                     // Sort standard labels to match standard order?
-                    // current_labels might be arbitrary. 
+                    // current_labels might be arbitrary.
                     // Let's filter standard list instead to keep order
                     let sorted_sys: Vec<String> = standard.iter()
                         .filter(|s| current_labels.contains(&s.to_string()))
                         .map(|s| s.to_string())
                         .collect();
-                    
+
                     // Remainder are others
                     // others is already populated above correctly (anything not in standard)
 
@@ -74,15 +82,15 @@ pub fn Sidebar(
                             children=move |label| {
                                 let label_str = label.clone();
                                 view! {
-                                    <SidebarButton 
-                                        label=label_str 
-                                        selected_label=selected_label 
+                                    <SidebarButton
+                                        label=label_str
+                                        selected_label=selected_label
                                         on_click=on_select_label
                                     />
                                 }
                             }
                         />
-                        
+
                         {if !others.is_empty() {
                             view! { <div class="mt-4 px-6 text-xs font-semibold text-gray-500 uppercase">"Labels"</div> }.into_view()
                         } else {
@@ -95,9 +103,9 @@ pub fn Sidebar(
                             children=move |label| {
                                 let label_str = label.clone();
                                 view! {
-                                    <SidebarButton 
-                                        label=label_str 
-                                        selected_label=selected_label 
+                                    <SidebarButton
+                                        label=label_str
+                                        selected_label=selected_label
                                         on_click=on_select_label
                                     />
                                 }
@@ -121,7 +129,7 @@ fn SidebarButton(
     let lbl_for_class = label.clone();
     let lbl_for_title = label.clone();
     let lbl_text = label.clone();
-    
+
     view! {
         <button
             on:click=move |_| on_click.call(lbl_for_click.clone())

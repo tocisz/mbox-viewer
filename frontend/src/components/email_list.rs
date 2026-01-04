@@ -140,7 +140,7 @@ pub fn EmailList(
 
         spawn_local(async move {
             set_loading.set(true);
-            let mut url = format!("http://localhost:8001/search?page={}&size=50", p); // Increased page size
+            let mut url = format!("/search?page={}&size=50", p); // Increased page size
             if !l.is_empty() {
                 url.push_str(&format!("&label={}", js_sys::encode_uri_component(&l)));
             }

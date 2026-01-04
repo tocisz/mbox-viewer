@@ -43,7 +43,7 @@ struct SearchParams {
     size: Option<usize>,
 }
 
-pub async fn run_server(port: u16, attachments_dir: String) -> anyhow::Result<()> {
+pub async fn run_server(host: String, port: u16, attachments_dir: String) -> anyhow::Result<()> {
     let index_path = std::env::var("INDEX_PATH").unwrap_or_else(|_| "tantivy_index".to_string());
     std::fs::create_dir_all(&index_path)?;
 
@@ -90,7 +90,6 @@ pub async fn run_server(port: u16, attachments_dir: String) -> anyhow::Result<()
         .layer(axum::extract::DefaultBodyLimit::max(50_000_000))
         .with_state(state);
 
-    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let addr_str = format!("{}:{}", host, port);
     let addr: SocketAddr = addr_str.parse().expect("Invalid address format");
     info!("Email Server listening on {}", addr);

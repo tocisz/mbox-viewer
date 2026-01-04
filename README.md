@@ -14,7 +14,7 @@ A local web application to view and search emails from a Gmail MBOX export (Goog
 
 ## Installation & Usage
 
-### Option 1: Docker (Recommended)
+### Option 1: Docker
 You can run the application immediately using Docker. This pulls the latest image from DockerHub.
 
 **1. Run the Viewer:**
@@ -39,7 +39,9 @@ Download the latest standalone binary from the [GitHub Releases](https://github.
    ```bash
    ./mbox-viewer serve --mbox-file path/to/mail.mbox
    ```
-   *Or set env var: `export MBOX_FILE=path/to/mail.mbox && ./mbox-viewer`*
+   *By default, the server listens on `127.0.0.1` (localhost). To access from other machines, use `--host 0.0.0.0`.*
+   *By default, data is stored in your OS's standard data directory (e.g., `~/.local/share/mbox-viewer` on Linux).*
+   *You can override this with `--index-path ./my-index` and `--attachments-dir ./my-attachments`.*
 4. Or manually index first:
    ```bash
    ./mbox-viewer index --mbox path/to/mail.mbox

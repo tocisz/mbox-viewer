@@ -36,7 +36,6 @@ WORKDIR /app/backend
 RUN cargo build --release --bin backend
 
 # Stage 3: Runtime
-# Stage 3: Runtime
 FROM scratch
 
 # Copy certificates

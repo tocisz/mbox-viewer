@@ -16,7 +16,7 @@ pub fn EmailDetail(
         let current_id = id_clone.clone();
         spawn_local(async move {
             set_loading.set(true);
-            let url = format!("http://localhost:8001/email/{}", current_id);
+            let url = format!("/email/{}", current_id);
             match Request::get(&url).send().await {
                 Ok(resp) => {
                     if let Ok(data) = resp.json::<EmailDetailData>().await {
@@ -105,7 +105,7 @@ pub fn EmailDetail(
                                                 children=move |att| {
                                                     let size_kb = att.size as f64 / 1024.0;
                                                     let size_str = format!("{:.1} KB", size_kb);
-                                                    let download_url = format!("http://localhost:8001/attachment/{}", att.path);
+                                                    let download_url = format!("/attachment/{}", att.path);
                                                     view! {
                                                         <div class="border rounded-lg p-3 flex flex-col gap-2 hover:bg-gray-50 transition-colors">
                                                             <div class="font-medium text-gray-800 truncate" title=att.filename.clone()>
