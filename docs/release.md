@@ -64,4 +64,4 @@ To enable the DockerHub build, configure the following **Repository Secrets**:
 3. The workflow will:
    - Build and test Frontend/Backend.
    - Build static binaries for Linux, Windows, and macOS (Intel & Apple Silicon), attaching them as zip files (e.g., `mbox-viewer-0.1.2-linux-amd64.zip`) to the GitHub Release.
-   - Build and push a multi-arch Docker image (`linux/amd64` and `linux/arm64`) to DockerHub (`<user>/mbox-viewer:latest` and `<user>/mbox-viewer:v1.0.0`).
+   - Build and push a multi-arch Docker image (`linux/amd64`, `linux/arm64`, `linux/arm/v7`) to DockerHub (`<user>/mbox-viewer:latest` and `<user>/mbox-viewer:v1.0.0`).

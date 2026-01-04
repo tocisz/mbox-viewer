@@ -22,6 +22,12 @@ jobs:
             use_cross: false
             archive_name: mbox-viewer-linux-amd64.zip
             binary_name: mbox-viewer
+          # Linux ARM (32-bit / ARMv7)
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-musleabihf
+            use_cross: true
+            archive_name: mbox-viewer-linux-armv7.zip
+            binary_name: mbox-viewer
           # Linux ARM64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-musl
@@ -170,11 +176,18 @@ jobs:
           name: binary-aarch64-unknown-linux-musl
           path: downloads/arm64
 
+      - name: Download ARMv7 Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-armv7-unknown-linux-musleabihf
+          path: downloads/armv7
+
       - name: Prepare Binaries for Docker
         run: |
           cp downloads/amd64/mbox-viewer binary-amd64
           cp downloads/arm64/mbox-viewer binary-arm64
-          chmod +x binary-amd64 binary-arm64
+          cp downloads/armv7/mbox-viewer binary-arm
+          chmod +x binary-amd64 binary-arm64 binary-arm
           ls -l binary-*
 
       - name: Set up QEMU
@@ -203,7 +216,7 @@ jobs:
         with:
           context: .
           file: Dockerfile.ci
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
