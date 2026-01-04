@@ -46,14 +46,17 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p release
-          cp backend/target/x86_64-unknown-linux-musl/release/backend release/mbox-viewer-linux-amd64
-          chmod +x release/mbox-viewer-linux-amd64
+          cp backend/target/x86_64-unknown-linux-musl/release/backend mbox-viewer
+          chmod +x mbox-viewer
+          VERSION=${{ github.ref_name }}
+          VERSION=${VERSION#v}
+          zip release/mbox-viewer-${VERSION}-linux-amd64.zip mbox-viewer
 
       - name: Upload Binary to Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: release/mbox-viewer-linux-amd64
+          files: release/mbox-viewer-*-linux-amd64.zip
 
   build-docker:
     name: Build Docker Image
