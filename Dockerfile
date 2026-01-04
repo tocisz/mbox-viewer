@@ -32,8 +32,8 @@ COPY . .
 WORKDIR /app/backend
 
 # Add musl target and build statically
-RUN rustup target add x86_64-unknown-linux-musl
-RUN cargo build --release --target x86_64-unknown-linux-musl --bin backend
+# RUN rustup target add x86_64-unknown-linux-musl
+RUN cargo build --release --bin backend
 
 # Stage 3: Runtime
 FROM alpine:latest
@@ -44,7 +44,7 @@ RUN apk add --no-cache ca-certificates libgcc
 WORKDIR /app
 
 # Copy Backend Binary
-COPY --from=backend-builder /app/backend/target/x86_64-unknown-linux-musl/release/backend /app/backend
+COPY --from=backend-builder /app/backend/target/release/backend /app/backend
 
 # Copy Frontend Artifacts
 COPY --from=frontend-builder /app/frontend/dist /app/frontend
