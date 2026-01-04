@@ -1,32 +1,27 @@
-FROM alpine:latest
+FROM scratch
 
 # TARGETARCH will be "amd64" or "arm64" automatically set by buildx
 ARG TARGETARCH
 
-# Install dependencies
-RUN apk add --no-cache ca-certificates libgcc
+# Copy certificates (required for HTTPS/TLS, e.g. if we ever download something)
+COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app
 
 # Copy the pre-compiled binary corresponding to the architecture
-# The CI workflow must first copy binary-linux-amd64 -> binary-amd64
-# and binary-linux-arm64 -> binary-arm64 into the context.
 COPY binary-${TARGETARCH} /app/backend
-RUN chmod +x /app/backend
-
-# Copy Entrypoint
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# No chmod needed in scratch (not supported/needed)
 
 # Environment Variables
 ENV PORT=8001
 ENV HOST=0.0.0.0
 ENV INDEX_PATH=/data/index
 ENV ATTACHMENTS_DIR=/data/attachments
-# Note: frontend assets are embedded in the binary for release builds
 ENV MBOX_FILE=/data/mail.mbox
 
 EXPOSE 8001
 VOLUME ["/data"]
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/backend", "serve"]
+
+

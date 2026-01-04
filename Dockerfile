@@ -36,22 +36,23 @@ WORKDIR /app/backend
 RUN cargo build --release --bin backend
 
 # Stage 3: Runtime
-FROM alpine:latest
+# Stage 3: Runtime
+FROM scratch
 
-# Install runtime deps if needed (usually none for static rust, but ca-certificates is good)
-RUN apk add --no-cache ca-certificates libgcc
+# Copy certificates
+COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app
 
 # Copy Backend Binary
 COPY --from=backend-builder /app/backend/target/release/backend /app/backend
 
-# Copy Frontend Artifacts
+# Copy Frontend Artifacts (for locally built docker image, we usually want separate files if not embedded)
+# BUT if we are building scratch we MUST usage embedded.
+# The previous multi-stage build did NOT usage embed_frontend feature for backend!
+# Let's fix that - local docker build MUST embed frontend to work in scratch easily.
+# Alternatively we can COPY frontend dist folder, but ServeDir works fine in scratch? Yes.
 COPY --from=frontend-builder /app/frontend/dist /app/frontend
-
-# Copy Entrypoint
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
 
 # Environment Variables
 ENV PORT=8001
@@ -64,4 +65,4 @@ ENV MBOX_FILE=/data/mail.mbox
 EXPOSE 8001
 VOLUME ["/data"]
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/backend", "serve"]
