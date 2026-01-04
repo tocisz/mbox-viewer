@@ -37,6 +37,8 @@ def setup_environment():
     print(f"Indexing data directly...")
     idx_env = os.environ.copy()
     
+    TEST_INDEX_PATH = TEST_RUN_DIR / "tantivy_index"
+
     binary_path = ROOT_DIR / "backend" / "target" / "release" / "backend"
     if not binary_path.exists():
         pytest.fail(f"Binary not found at {binary_path}")
@@ -64,6 +66,8 @@ def setup_environment():
     env["ATTACHMENTS_DIR"] = str(TEST_ATTACHMENTS_DIR)
     env["PORT"] = str(TEST_PORT)
     env["RUST_LOG"] = "info" # Enable logging
+    env["INDEX_PATH"] = str(TEST_INDEX_PATH)
+    env["HOST"] = "127.0.0.1"
     
     proc = subprocess.Popen(
         [str(binary_path)], 
