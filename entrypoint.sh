@@ -17,6 +17,7 @@ if [ ! -f "$INDEX_PATH/meta.json" ]; then
         /app/backend index --mbox "$MBOX_FILE" --attachments-dir "$ATTACHMENTS_DIR"
         
         echo "Indexing complete."
+        exit 0
     else
         echo "WARNING: No MBOX file found at $MBOX_FILE"
         echo "To auto-index, mount your mbox file: -v /path/to/my.mbox:/data/mail.mbox"
