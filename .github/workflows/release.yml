@@ -10,8 +10,49 @@ permissions:
 
 jobs:
   build-binary:
-    name: Build Static Binary
-    runs-on: ubuntu-latest
+    name: Build Binary (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            use_cross: false
+            archive_name: mbox-viewer-linux-amd64.zip
+            binary_name: mbox-viewer
+          # Linux ARM64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            use_cross: true
+            archive_name: mbox-viewer-linux-arm64.zip
+            binary_name: mbox-viewer
+          # MacOS Intel
+          - os: macos-13
+            target: x86_64-apple-darwin
+            use_cross: false
+            archive_name: mbox-viewer-darwin-amd64.zip
+            binary_name: mbox-viewer
+          # MacOS Silicon
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            use_cross: false
+            archive_name: mbox-viewer-darwin-arm64.zip
+            binary_name: mbox-viewer
+          # Windows x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use_cross: false
+            archive_name: mbox-viewer-windows-amd64.zip
+            binary_name: mbox-viewer.exe
+          # Windows ARM64
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            use_cross: false
+            archive_name: mbox-viewer-windows-arm64.zip
+            binary_name: mbox-viewer.exe
+
     steps:
       - uses: actions/checkout@v4
 
@@ -23,10 +64,17 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-unknown-linux-musl, wasm32-unknown-unknown
+          targets: ${{ matrix.target }}, wasm32-unknown-unknown
 
+      # Linux specific setup for musl
       - name: Install musl-tools
+        if: matrix.os == 'ubuntu-latest' && matrix.use_cross == false
         run: sudo apt-get install -y musl-tools
+
+      # Install Cross if needed
+      - name: Install Cross
+        if: matrix.use_cross == true
+        run: cargo install cross
 
       - name: Install npm dependencies
         working-directory: frontend
@@ -36,27 +84,61 @@ jobs:
         working-directory: frontend
         run: trunk build --release
 
-      - name: Build Backend (Static)
+      - name: Build Backend
         working-directory: backend
-        # Using cross or simply cargo build with target if musl-tools is sufficient.
-        # Ideally 'cross' is better for musl but 'musl-tools' + 'cargo build' works for simple cases.
-        # We'll use standard cargo build with musl target since we installed musl-tools.
-        run: cargo build --release --target x86_64-unknown-linux-musl --features embed_frontend
+        run: |
+          if [ "${{ matrix.use_cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }} --features embed_frontend
+          else
+            cargo build --release --target ${{ matrix.target }} --features embed_frontend
+          fi
+        shell: bash
 
-      - name: Prepare Artifact
+      - name: Prepare Artifact (Unix)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p release
-          cp backend/target/x86_64-unknown-linux-musl/release/backend mbox-viewer
-          chmod +x mbox-viewer
+          cp backend/target/${{ matrix.target }}/release/backend ${{ matrix.binary_name }}
+          chmod +x ${{ matrix.binary_name }}
+          
+          # Clean version number (v0.1.0 -> 0.1.0)
           VERSION=${{ github.ref_name }}
           VERSION=${VERSION#v}
-          zip release/mbox-viewer-${VERSION}-linux-amd64.zip mbox-viewer
+          
+          # Construct dynamic archive name based on matrix
+          # e.g. mbox-viewer-0.1.0-linux-amd64.zip
+          # We replace the static part of matrix.archive_name with versioned one
+          
+          # For simplicity let's rely on constructing it:
+          # Expected: mbox-viewer-VERSION-OS-ARCH.zip
+          # We can re-use the suffix from matrix.archive_name
+          # suffix = linux-amd64.zip
+          SUFFIX=$(echo ${{ matrix.archive_name }} | sed 's/mbox-viewer-//')
+          ARCHIVE_NAME="mbox-viewer-${VERSION}-${SUFFIX}"
+          
+          zip release/$ARCHIVE_NAME ${{ matrix.binary_name }}
+          echo "ARCHIVE_PATH=release/$ARCHIVE_NAME" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Prepare Artifact (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path release
+          Copy-Item "backend/target/${{ matrix.target }}/release/backend.exe" -Destination "${{ matrix.binary_name }}"
+          
+          $Version = "${{ github.ref_name }}".TrimStart('v')
+          $Suffix = "${{ matrix.archive_name }}".Replace('mbox-viewer-', '')
+          $ArchiveName = "mbox-viewer-$Version-$Suffix"
+          
+          Compress-Archive -Path "${{ matrix.binary_name }}" -DestinationPath "release/$ArchiveName"
+          echo "ARCHIVE_PATH=release/$ArchiveName" >> $env:GITHUB_ENV
+        shell: powershell
 
       - name: Upload Binary to Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: release/mbox-viewer-*-linux-amd64.zip
+          files: ${{ env.ARCHIVE_PATH }}
 
   build-docker:
     name: Build Docker Image
