@@ -143,11 +143,39 @@ jobs:
         with:
           files: ${{ env.ARCHIVE_PATH }}
 
+      - name: Upload Raw Binary for Docker
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: ${{ matrix.binary_name }}
+          retention-days: 1
+
   build-docker:
     name: Build Docker Image
+    needs: build-binary
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download AMD64 Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-x86_64-unknown-linux-musl
+          path: downloads/amd64
+
+      - name: Download ARM64 Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-aarch64-unknown-linux-musl
+          path: downloads/arm64
+
+      - name: Prepare Binaries for Docker
+        run: |
+          cp downloads/amd64/mbox-viewer binary-amd64
+          cp downloads/arm64/mbox-viewer binary-arm64
+          chmod +x binary-amd64 binary-arm64
+          ls -l binary-*
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -174,6 +202,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: Dockerfile.ci
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

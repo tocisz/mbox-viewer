@@ -34,8 +34,10 @@ To run integration tests, set up a virtual environment:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r tests/requirements.txt
-```
+### 4. Docker Builds
+- **Local Development**: Use standard `docker build .` (uses `Dockerfile`). builds from source.
+- **CI/Release**: Uses `Dockerfile.ci` which expects pre-compiled binaries to speed up multi-arch builds.
+
 
 ## Running Locally
 
